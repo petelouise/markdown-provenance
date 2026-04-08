@@ -1,0 +1,9 @@
+{
+	"id": "markdown-provenance",
+	"name": "Markdown Provenance",
+	"version": "0.1.0",
+	"minAppVersion": "0.15.0",
+	"description": "Visualise the provenance of text in your notes — mark content as written by you, an AI assistant, a quoted source, or unknown.",
+	"author": "petelouise",
+	"isDesktopOnly": false
+}

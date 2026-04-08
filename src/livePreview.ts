@@ -31,7 +31,7 @@ export function buildLivePreviewExtension(app: App) {
 			}
 
 			update(update: ViewUpdate) {
-				if (update.docChanged || update.viewportChanged) {
+				if (update.docChanged || update.viewportChanged || update.selectionSet) {
 					this.decorations = buildDecorations(update.view, app);
 				}
 			}
@@ -52,6 +52,9 @@ const LETTER_TO_WORD: Record<string, ProvenanceWord> = {
 };
 
 type SpanRange = { from: number; to: number; provenance: ProvenanceWord };
+type DecoEntry = { from: number; to: number; deco: Decoration };
+
+const HIDE = Decoration.replace({});
 
 function buildDecorations(view: EditorView, app: App): DecorationSet {
 	// Read document default from frontmatter
@@ -61,33 +64,48 @@ function buildDecorations(view: EditorView, app: App): DecorationSet {
 		: null;
 	const docDefault = normalizeFrontmatter(frontmatter?.provenance);
 
-	const builder = new RangeSetBuilder<Decoration>();
 	const spans: SpanRange[] = [];
-
 	for (const { from, to } of view.visibleRanges) {
 		const text = view.state.doc.sliceString(from, to);
 		findSpans(text, from, spans);
 	}
-
-	// RangeSetBuilder requires decorations in ascending `from` order.
-	// findSpans returns outer spans before inner spans, which already satisfies
-	// the sort since outer.from <= inner.from. Sort to be safe.
 	spans.sort((a, b) => a.from - b.from || b.to - a.to);
+
+	const cursorHead = view.state.selection.main.head;
+	const entries: DecoEntry[] = [];
 
 	for (const span of spans) {
 		const classes = ["mdp-span"];
 		if (span.provenance === docDefault) classes.push("mdp-default");
+		const mark = Decoration.mark({
+			class: classes.join(" "),
+			attributes: { "data-provenance": span.provenance },
+		});
 
-		builder.add(
-			span.from,
-			span.to,
-			Decoration.mark({
-				class: classes.join(" "),
-				attributes: { "data-provenance": span.provenance },
-			})
-		);
+		const cursorInSpan = cursorHead >= span.from && cursorHead <= span.to;
+
+		if (cursorInSpan) {
+			// Cursor is inside this span — show raw syntax with tint
+			entries.push({ from: span.from, to: span.to, deco: mark });
+		} else {
+			// Cursor is elsewhere — hide %X{ and }, tint only the inner content
+			const innerFrom = span.from + 3; // character after {
+			const innerTo = span.to - 1;     // the closing }
+			entries.push({ from: span.from,  to: span.from + 3, deco: HIDE });
+			if (innerFrom < innerTo) {
+				entries.push({ from: innerFrom, to: innerTo, deco: mark });
+			}
+			entries.push({ from: innerTo, to: span.to, deco: HIDE });
+		}
 	}
 
+	// RangeSetBuilder requires ascending `from`; equal `from` → wider range first
+	entries.sort((a, b) => a.from - b.from || b.to - a.to);
+
+	const builder = new RangeSetBuilder<Decoration>();
+	for (const { from, to, deco } of entries) {
+		builder.add(from, to, deco);
+	}
 	return builder.finish();
 }
 

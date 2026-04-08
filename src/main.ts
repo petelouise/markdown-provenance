@@ -1,5 +1,8 @@
 import { Plugin, TFile } from "obsidian";
-import { normalizeFrontmatter, processElement } from "./renderer";
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+import { normalizeProvenance } from "./provenance";
+import { processElement } from "./renderer";
 import { buildLivePreviewExtension } from "./livePreview";
 import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCSS } from "./settings";
 import { MDPSettingTab } from "./settingsTab";
@@ -13,21 +16,36 @@ export default class MDPPlugin extends Plugin {
 		await this.loadSettings();
 		this.applyStyles();
 
-		// Live Preview (CodeMirror 6)
-		this.registerEditorExtension(buildLivePreviewExtension(this.app));
+		// Live Preview (CodeMirror 6) — pass plugin as context
+		this.registerEditorExtension(buildLivePreviewExtension(this));
 
 		// Reading mode
 		this.registerMarkdownPostProcessor((el, ctx) => {
 			const abstractFile = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
 			const file = abstractFile instanceof TFile ? abstractFile : null;
-
 			const frontmatter = file
 				? this.app.metadataCache.getFileCache(file)?.frontmatter
 				: null;
-
-			const documentDefault = normalizeFrontmatter(frontmatter?.provenance);
-			processElement(el as HTMLElement, documentDefault);
+			const docDefault = normalizeProvenance(frontmatter?.provenance);
+			processElement(el as HTMLElement, docDefault, this.settings.pluginDefault);
 		});
+
+		// Auto-insert frontmatter into new notes
+		this.registerEvent(
+			this.app.vault.on("create", async (file) => {
+				if (!(file instanceof TFile) || file.extension !== "md") return;
+				if (!this.settings.autoInsertFrontmatter) return;
+				if (this.settings.pluginDefault === "none") return;
+				// Brief delay for Obsidian to finish writing the file
+				await sleep(50);
+				const content = await this.app.vault.read(file);
+				if (content.startsWith("---")) return; // already has frontmatter
+				await this.app.vault.modify(
+					file,
+					`---\nprovenance: ${this.settings.pluginDefault}\n---\n${content}`
+				);
+			})
+		);
 
 		this.addSettingTab(new MDPSettingTab(this.app, this));
 	}
@@ -42,7 +60,7 @@ export default class MDPPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData() as Partial<MDPSettings>
 		);
-		// Ensure nested colors object is fully merged
+		// Deep-merge nested colors so missing keys fall back to defaults
 		this.settings.colors = Object.assign(
 			{},
 			DEFAULT_SETTINGS.colors,

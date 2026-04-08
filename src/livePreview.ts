@@ -3,7 +3,8 @@
  *
  * Applies provenance decorations in CodeMirror 6 (Obsidian Live Preview mode)
  * by scanning visible ranges for MDP span syntax and adding Decoration.mark()
- * for each matched range.
+ * for each matched range. Syntax delimiters are hidden when the cursor is
+ * outside a span.
  */
 
 import {
@@ -15,24 +16,40 @@ import {
 } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import { App } from "obsidian";
-import { normalizeFrontmatter, ProvenanceWord } from "./renderer";
+import {
+	ProvenanceWord,
+	ProvenanceLetter,
+	LETTER_TO_WORD,
+	normalizeProvenance,
+	effectiveDefault,
+} from "./provenance";
+import { MDPSettings } from "./settings";
+
+// ---------------------------------------------------------------------------
+// Context interface (avoids circular import with main.ts)
+// ---------------------------------------------------------------------------
+
+export interface MDPPluginContext {
+	app: App;
+	settings: MDPSettings;
+}
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-export function buildLivePreviewExtension(app: App) {
+export function buildLivePreviewExtension(plugin: MDPPluginContext) {
 	return ViewPlugin.fromClass(
 		class {
 			decorations: DecorationSet;
 
 			constructor(view: EditorView) {
-				this.decorations = buildDecorations(view, app);
+				this.decorations = buildDecorations(view, plugin);
 			}
 
 			update(update: ViewUpdate) {
 				if (update.docChanged || update.viewportChanged || update.selectionSet) {
-					this.decorations = buildDecorations(update.view, app);
+					this.decorations = buildDecorations(update.view, plugin);
 				}
 			}
 		},
@@ -44,30 +61,23 @@ export function buildLivePreviewExtension(app: App) {
 // Decoration builder
 // ---------------------------------------------------------------------------
 
-const LETTER_TO_WORD: Record<string, ProvenanceWord> = {
-	a: "assistant",
-	s: "self",
-	q: "quote",
-	u: "unknown",
-};
-
 type SpanRange = { from: number; to: number; provenance: ProvenanceWord };
 type DecoEntry = { from: number; to: number; deco: Decoration };
 
 const HIDE = Decoration.replace({});
 
-function buildDecorations(view: EditorView, app: App): DecorationSet {
-	// Read document default from frontmatter
-	const activeFile = app.workspace.getActiveFile();
+function buildDecorations(view: EditorView, plugin: MDPPluginContext): DecorationSet {
+	const activeFile = plugin.app.workspace.getActiveFile();
 	const frontmatter = activeFile
-		? app.metadataCache.getFileCache(activeFile)?.frontmatter
+		? plugin.app.metadataCache.getFileCache(activeFile)?.frontmatter
 		: null;
-	const docDefault = normalizeFrontmatter(frontmatter?.provenance);
+
+	const docDefault    = normalizeProvenance(frontmatter?.provenance);
+	const def           = effectiveDefault(docDefault, plugin.settings.pluginDefault);
 
 	const spans: SpanRange[] = [];
 	for (const { from, to } of view.visibleRanges) {
-		const text = view.state.doc.sliceString(from, to);
-		findSpans(text, from, spans);
+		findSpans(view.state.doc.sliceString(from, to), from, spans);
 	}
 	spans.sort((a, b) => a.from - b.from || b.to - a.to);
 
@@ -76,7 +86,7 @@ function buildDecorations(view: EditorView, app: App): DecorationSet {
 
 	for (const span of spans) {
 		const classes = ["mdp-span"];
-		if (span.provenance === docDefault) classes.push("mdp-default");
+		if (span.provenance === def) classes.push("mdp-default");
 		const mark = Decoration.mark({
 			class: classes.join(" "),
 			attributes: { "data-provenance": span.provenance },
@@ -85,12 +95,10 @@ function buildDecorations(view: EditorView, app: App): DecorationSet {
 		const cursorInSpan = cursorHead >= span.from && cursorHead <= span.to;
 
 		if (cursorInSpan) {
-			// Cursor is inside this span — show raw syntax with tint
 			entries.push({ from: span.from, to: span.to, deco: mark });
 		} else {
-			// Cursor is elsewhere — hide %X{ and }, tint only the inner content
-			const innerFrom = span.from + 3; // character after {
-			const innerTo = span.to - 1;     // the closing }
+			const innerFrom = span.from + 3;
+			const innerTo   = span.to - 1;
 			entries.push({ from: span.from,  to: span.from + 3, deco: HIDE });
 			if (innerFrom < innerTo) {
 				entries.push({ from: innerFrom, to: innerTo, deco: mark });
@@ -99,7 +107,6 @@ function buildDecorations(view: EditorView, app: App): DecorationSet {
 		}
 	}
 
-	// RangeSetBuilder requires ascending `from`; equal `from` → wider range first
 	entries.sort((a, b) => a.from - b.from || b.to - a.to);
 
 	const builder = new RangeSetBuilder<Decoration>();
@@ -113,97 +120,54 @@ function buildDecorations(view: EditorView, app: App): DecorationSet {
 // Position-aware span scanner
 // ---------------------------------------------------------------------------
 
-/**
- * Walk `text` (which starts at document position `offset`) and push all MDP
- * span ranges into `out`. Handles nesting and escapes. Does not parse inside
- * backtick code spans.
- */
 function findSpans(text: string, offset: number, out: SpanRange[]): void {
 	let i = 0;
-
 	while (i < text.length) {
-		// Escape sequence: skip two chars
-		if (text[i] === "\\" && i + 1 < text.length) {
-			i += 2;
-			continue;
-		}
+		if (text[i] === "\\" && i + 1 < text.length) { i += 2; continue; }
+		if (text[i] === "`") { i = skipCodeSpan(text, i); continue; }
 
-		// Backtick code span: skip to matching fence
-		if (text[i] === "`") {
-			i = skipCodeSpan(text, i);
-			continue;
-		}
-
-		// MDP span opener: %[asqu]{
 		if (
 			text[i] === "%" &&
 			i + 2 < text.length &&
 			"asqu".includes(text[i + 1] ?? "") &&
 			text[i + 2] === "{"
 		) {
-			const sigil = text[i + 1] as string;
+			const sigil    = text[i + 1] as ProvenanceLetter;
 			const spanFrom = i;
 			let depth = 1;
 			let j = i + 3;
 
 			while (j < text.length && depth > 0) {
-				if (text[j] === "\\" && j + 1 < text.length) {
-					j += 2;
-					continue;
-				}
+				if (text[j] === "\\" && j + 1 < text.length) { j += 2; continue; }
 				if (text[j] === "{") depth++;
 				if (text[j] === "}") depth--;
 				j++;
 			}
 
-			// j is now just past the closing }
-			const spanTo = j;
-
+			const spanTo    = j;
 			const provenance = LETTER_TO_WORD[sigil];
-			if (!provenance) { i = spanTo; continue; } // unreachable, satisfies TS
+			if (!provenance) { i = spanTo; continue; }
 
-			out.push({
-				from: offset + spanFrom,
-				to: offset + spanTo,
-				provenance,
-			});
-
-			// Recurse into content between %X{ and } for nested spans
-			const innerText = text.slice(spanFrom + 3, spanTo - 1);
-			findSpans(innerText, offset + spanFrom + 3, out);
-
+			out.push({ from: offset + spanFrom, to: offset + spanTo, provenance });
+			findSpans(text.slice(spanFrom + 3, spanTo - 1), offset + spanFrom + 3, out);
 			i = spanTo;
 			continue;
 		}
-
 		i++;
 	}
 }
 
-/**
- * Given that text[start] === '`', find the end of the code span and return
- * the index just past it. Handles multi-backtick fences.
- */
 function skipCodeSpan(text: string, start: number): number {
 	let tickCount = 0;
 	let i = start;
-
-	while (i < text.length && text[i] === "`") {
-		tickCount++;
-		i++;
-	}
-
+	while (i < text.length && text[i] === "`") { tickCount++; i++; }
 	const fence = "`".repeat(tickCount);
-
 	while (i < text.length) {
 		const closeIdx = text.indexOf(fence, i);
-		if (closeIdx === -1) return i; // no closing fence — treat opener as literal
+		if (closeIdx === -1) return i;
 		const afterClose = closeIdx + tickCount;
-		if (afterClose >= text.length || text[afterClose] !== "`") {
-			return afterClose;
-		}
+		if (afterClose >= text.length || text[afterClose] !== "`") return afterClose;
 		i = closeIdx + 1;
 	}
-
 	return i;
 }

@@ -1,127 +1,97 @@
 /**
- * MDP renderer.
+ * MDP renderer — post-processor for Reading mode.
  *
- * Walks the DOM of a rendered Markdown section, finds text nodes that contain
+ * Walks the DOM of a rendered Markdown section, finds text nodes containing
  * MDP provenance syntax, and replaces them with styled <span> elements.
  */
 
 import { parse, Segment } from "./parser";
+import {
+	ProvenanceWord,
+	LETTER_TO_WORD,
+	normalizeProvenance,
+	effectiveDefault,
+} from "./provenance";
+import { MDPSettings } from "./settings";
+
+// Re-export for callers that previously imported from here
+export type { ProvenanceWord };
+export { normalizeProvenance };
 
 // ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type ProvenanceWord = "assistant" | "self" | "quote" | "unknown";
-
-const LETTER_TO_WORD: Record<string, ProvenanceWord> = {
-  a: "assistant",
-  s: "self",
-  q: "quote",
-  u: "unknown",
-};
-
-const WORD_TO_WORD = new Set<string>(Object.values(LETTER_TO_WORD));
-
-/**
- * Normalise a raw frontmatter value (e.g. "self", "assistant") to a
- * ProvenanceWord.  Returns null for absent/unrecognised values.
- */
-export function normalizeFrontmatter(
-  value: unknown
-): ProvenanceWord | null {
-  if (typeof value === "string" && WORD_TO_WORD.has(value)) {
-    return value as ProvenanceWord;
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// DOM processing
+// Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Walk all text nodes in `el`, parse MDP syntax, and replace any that contain
  * provenance spans with the corresponding DOM structure.
  *
- * @param el            The section element provided by Obsidian's post-processor.
- * @param documentDefault  The note's frontmatter provenance default, or null.
+ * @param el             Section element from Obsidian's post-processor.
+ * @param docDefault     Provenance declared in the note's frontmatter, or null.
+ * @param pluginDefault  Plugin-level fallback from settings.
  */
 export function processElement(
-  el: HTMLElement,
-  documentDefault: ProvenanceWord | null
+	el: HTMLElement,
+	docDefault: ProvenanceWord | null,
+	pluginDefault: MDPSettings["pluginDefault"]
 ): void {
-  // Collect text nodes up-front to avoid mutation during traversal
-  const textNodes = collectTextNodes(el);
-  for (const node of textNodes) {
-    processTextNode(node, documentDefault);
-  }
+	const def = effectiveDefault(docDefault, pluginDefault);
+	const textNodes = collectTextNodes(el);
+	for (const node of textNodes) {
+		processTextNode(node, def);
+	}
 }
 
 // ---------------------------------------------------------------------------
-// Internals
+// DOM helpers
 // ---------------------------------------------------------------------------
 
-/** Collect all TEXT_NODEs in `root`, skipping <code> and <pre> subtrees. */
 function collectTextNodes(root: HTMLElement): Text[] {
-  const results: Text[] = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      // Skip content inside <code> or <pre>
-      let parent = node.parentElement;
-      while (parent) {
-        const tag = parent.tagName.toLowerCase();
-        if (tag === "code" || tag === "pre") return NodeFilter.FILTER_REJECT;
-        if (parent === root) break;
-        parent = parent.parentElement;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    results.push(node as Text);
-  }
-  return results;
+	const results: Text[] = [];
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+		acceptNode(node) {
+			let parent = node.parentElement;
+			while (parent) {
+				const tag = parent.tagName.toLowerCase();
+				if (tag === "code" || tag === "pre") return NodeFilter.FILTER_REJECT;
+				if (parent === root) break;
+				parent = parent.parentElement;
+			}
+			return NodeFilter.FILTER_ACCEPT;
+		},
+	});
+	let node: Node | null;
+	while ((node = walker.nextNode())) results.push(node as Text);
+	return results;
 }
 
-/** Parse a single text node and replace it if it contains any MDP spans. */
-function processTextNode(
-  node: Text,
-  documentDefault: ProvenanceWord | null
-): void {
-  const content = node.textContent ?? "";
-  if (!content.includes("%")) return; // fast bail-out
+function processTextNode(node: Text, def: ProvenanceWord | null): void {
+	const content = node.textContent ?? "";
+	if (!content.includes("%")) return;
 
-  const segments = parse(content);
-  const hasAnySpan = segments.some((s) => s.kind === "span");
-  if (!hasAnySpan) return;
+	const segments = parse(content);
+	if (!segments.some((s) => s.kind === "span")) return;
 
-  const fragment = buildFragment(segments, documentDefault);
-  node.replaceWith(fragment);
+	node.replaceWith(buildFragment(segments, def));
 }
 
-/** Recursively convert a Segment tree into DOM nodes. */
 function buildFragment(
-  segments: Segment[],
-  documentDefault: ProvenanceWord | null
+	segments: Segment[],
+	def: ProvenanceWord | null
 ): DocumentFragment {
-  const frag = document.createDocumentFragment();
-  for (const seg of segments) {
-    if (seg.kind === "text") {
-      frag.appendChild(document.createTextNode(seg.content));
-    } else {
-      const word = LETTER_TO_WORD[seg.provenance];
-      const span = document.createElement("span");
-      span.classList.add("mdp-span");
-      span.dataset.provenance = word;
-      if (word === documentDefault) {
-        span.classList.add("mdp-default");
-      }
-      // Recurse into children
-      span.appendChild(buildFragment(seg.children, documentDefault));
-      frag.appendChild(span);
-    }
-  }
-  return frag;
+	const frag = document.createDocumentFragment();
+	for (const seg of segments) {
+		if (seg.kind === "text") {
+			frag.appendChild(document.createTextNode(seg.content));
+		} else {
+			const word = LETTER_TO_WORD[seg.provenance];
+			const span = document.createElement("span");
+			span.classList.add("mdp-span");
+			span.dataset.provenance = word;
+			if (word === def) span.classList.add("mdp-default");
+			span.appendChild(buildFragment(seg.children, def));
+			frag.appendChild(span);
+		}
+	}
+	return frag;
 }

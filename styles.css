@@ -1,9 +1,9 @@
 /* ── Markdown Provenance (MDP) ───────────────────────────────────────────── */
 
 /*
-  Colors are injected as CSS custom properties by the plugin at load time
-  and whenever the user changes them in settings. The defaults here act as
-  a fallback if the dynamic style element is somehow absent.
+  Colours are injected as CSS custom properties by the plugin at load time
+  and whenever the user changes them in settings. The fallback values here
+  apply only if the dynamic <style> element is absent.
 */
 
 .mdp-span {
@@ -15,9 +15,8 @@
   background-color: var(--mdp-color-assistant, rgba(100, 149, 237, 0.18));
 }
 
-/* self — always unstyled; this is the author's own voice */
 .mdp-span[data-provenance="self"] {
-  background-color: transparent;
+  background-color: var(--mdp-color-self, rgba(160, 160, 176, 0.15));
 }
 
 .mdp-span[data-provenance="quote"] {
@@ -28,7 +27,7 @@
   background-color: var(--mdp-color-unknown, rgba(255, 193, 7, 0.22));
 }
 
-/* Span whose provenance matches the note's frontmatter default — no tint needed */
+/* Span whose provenance matches the effective default — suppress the tint */
 .mdp-span.mdp-default {
   background-color: transparent;
 }

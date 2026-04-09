@@ -34,15 +34,27 @@ export function hexToRgba(hex: string, alpha: number): string {
 	return `rgba(${parseInt(match[1], 16)}, ${parseInt(match[2], 16)}, ${parseInt(match[3], 16)}, ${alpha})`;
 }
 
-/** Build the CSS custom-property block injected at runtime. */
+/**
+ * Build the CSS custom-property block injected at runtime.
+ * Generates separate values for light and dark themes so tints remain
+ * legible regardless of the active Obsidian colour scheme.
+ *
+ * Light mode uses lighter opacity; dark mode uses slightly higher opacity
+ * since the same hue needs more presence against a dark canvas.
+ */
 export function buildDynamicCSS(settings: MDPSettings): string {
 	const c = settings.colors;
-	const fallback = DEFAULT_SETTINGS.colors;
+	const fb = DEFAULT_SETTINGS.colors;
+
+	const vars = (alpha: { assistant: number; self: number; quote: number; unknown: number }) => `
+  --mdp-color-assistant: ${hexToRgba(c.assistant ?? fb.assistant, alpha.assistant)};
+  --mdp-color-self:      ${hexToRgba(c.self      ?? fb.self,      alpha.self)};
+  --mdp-color-quote:     ${hexToRgba(c.quote     ?? fb.quote,     alpha.quote)};
+  --mdp-color-unknown:   ${hexToRgba(c.unknown   ?? fb.unknown,   alpha.unknown)};`.trimEnd();
+
 	return `
-:root {
-  --mdp-color-assistant: ${hexToRgba(c.assistant ?? fallback.assistant, 0.18)};
-  --mdp-color-self:      ${hexToRgba(c.self      ?? fallback.self,      0.15)};
-  --mdp-color-quote:     ${hexToRgba(c.quote     ?? fallback.quote,     0.18)};
-  --mdp-color-unknown:   ${hexToRgba(c.unknown   ?? fallback.unknown,   0.22)};
+body.theme-light {${vars({ assistant: 0.18, self: 0.15, quote: 0.18, unknown: 0.22 })}
+}
+body.theme-dark {${vars({ assistant: 0.28, self: 0.22, quote: 0.26, unknown: 0.32 })}
 }`.trim();
 }

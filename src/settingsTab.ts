@@ -35,16 +35,19 @@ export class MDPSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.separateDarkMode)
 					.onChange(async (value) => {
+						if (value === this.plugin.settings.separateDarkMode) return;
 						if (value && !this.plugin.settings.darkColors) {
 							this.plugin.settings.darkColors = { ...this.plugin.settings.colors };
 						}
 						this.plugin.settings.separateDarkMode = value;
 						await this.plugin.saveSettings();
-						this.plugin.applyStyles();
 						this.display();
 					});
 			});
 
+		if (this.plugin.settings.separateDarkMode && !this.plugin.settings.darkColors) {
+			this.plugin.settings.darkColors = { ...this.plugin.settings.colors };
+		}
 		const dm = this.plugin.settings.separateDarkMode;
 		this.addColorSetting("User",      "Your own writing  (%u{...})",               "user",      dm);
 		this.addColorSetting("Assistant", "AI-generated text  (%a{...})",              "assistant", dm);

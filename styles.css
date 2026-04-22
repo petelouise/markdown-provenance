@@ -15,12 +15,12 @@
   background-color: var(--mdp-color-assistant, rgba(100, 149, 237, 0.18));
 }
 
-.mdp-span[data-provenance="self"] {
-  background-color: var(--mdp-color-self, rgba(160, 160, 176, 0.15));
+.mdp-span[data-provenance="user"] {
+  background-color: var(--mdp-color-user, rgba(160, 160, 176, 0.15));
 }
 
-.mdp-span[data-provenance="quote"] {
-  background-color: var(--mdp-color-quote, rgba(60, 179, 113, 0.18));
+.mdp-span[data-provenance="external"] {
+  background-color: var(--mdp-color-external, rgba(60, 179, 113, 0.18));
 }
 
 .mdp-span[data-provenance="unknown"] {

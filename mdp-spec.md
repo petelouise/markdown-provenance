@@ -1,6 +1,6 @@
-# Markdown Provenance Extension (MPE)
+# Markdown Provenance (MDP)
 
-**Version:** 0.1.0-draft
+**Version:** 0.2.0-draft
 **Status:** Draft
 **Author:** Louise, with Claude (Anthropic)
 
@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-MPE adds inline and block-level provenance markers to Markdown, indicating whether text was authored by an AI, the document's human author, another human, or is of unknown/mixed origin.
+MDP adds inline and block-level provenance markers to Markdown, indicating whether text was authored by an AI assistant, the document's human author, an external source, or is of unknown/mixed origin.
 
 The design prioritizes elegance, minimal collision with existing Markdown syntax, and a small surface area that does not preclude future extension.
 
@@ -16,14 +16,16 @@ The design prioritizes elegance, minimal collision with existing Markdown syntax
 
 ## 2. Provenance Types
 
-| Prefix | Meaning       | Mnemonic                          |
-|--------|---------------|-----------------------------------|
-| `%a`   | AI-generated  | **a**utomated / **a**rtificial    |
-| `%h`   | Human (self)  | **h**uman, the document's author  |
-| `%o`   | Other human   | **o**ther contributor             |
-| `%?`   | Unknown/mixed | **?** — uncertain                 |
+| Sigil | Meaning       | Mnemonic                               |
+|-------|---------------|----------------------------------------|
+| `%a`  | Assistant     | **a**ssistant / **a**rtificial         |
+| `%u`  | User          | **u**ser, the document's author        |
+| `%q`  | External      | **q**uoted / external source           |
+| `%?`  | Unknown/mixed | **?** — uncertain                      |
 
-These four prefixes are the complete set. No other single-letter prefixes are defined in this version. The uppercase variants (`%A`, `%H`, `%O`) are reserved for future use and MUST NOT be emitted by conforming writers.
+These four sigils are the complete set. No other single-character sigils are defined in this version. Uppercase variants (`%A`, `%U`, `%Q`) are reserved for future use and MUST NOT be emitted by conforming writers.
+
+The vocabulary (`assistant`, `user`, `external`, `unknown`) intentionally mirrors LLM prompt conventions, where `assistant` and `user` are the standard role names. This makes the format generic across tools: "user" works whether there is one author or many, and future dot-notation (`%u.david`) will distinguish individual contributors without requiring a separate sigil.
 
 ---
 
@@ -33,13 +35,22 @@ A document MAY declare a default provenance in its YAML frontmatter:
 
 ```yaml
 ---
-provenance: human
+provenance: user
 ---
 ```
 
-Valid values are `ai`, `human`, `other`, `unknown`. When a default is set, all unmarked text is assumed to carry that provenance. Only exceptions need inline or block markers.
+Valid values are `assistant`, `user`, `external`, `unknown`. When a default is set, all unmarked text is assumed to carry that provenance. Only exceptions need inline or block markers.
 
-If no frontmatter key is present, the default provenance is `unknown`.
+If no frontmatter key is present, the default falls back to the plugin-level setting (see §9.1).
+
+**Accepted aliases** (for convenience and backward compatibility):
+
+| Alias    | Resolves to |
+|----------|-------------|
+| `ai`     | `assistant` |
+| `human`  | `user`      |
+| `self`   | `user`      |
+| `quote`  | `external`  |
 
 ---
 
@@ -51,14 +62,14 @@ If no frontmatter key is present, the default provenance is `unknown`.
 %a{AI-generated text here}
 ```
 
-The marker is a provenance prefix immediately followed by an opening curly brace, the content, and a closing curly brace. There MUST NOT be whitespace between the prefix and the opening brace.
+The marker is a sigil immediately followed by an opening curly brace, the content, and a closing curly brace. There MUST NOT be whitespace between the sigil and the opening brace.
 
 Examples:
 
 ```markdown
 The results were %a{statistically significant at p < 0.01} according to the analysis.
 
-I asked my colleague, who replied %o{we should revisit this in Q3}.
+The original paper noted %q{we should revisit this in Q3}.
 
 The summary is %?{a mix of my notes and ChatGPT output}.
 ```
@@ -70,7 +81,7 @@ Provenance spans wrap formatting, not the reverse. Provenance operates at a high
 ```markdown
 %a{the **important** point}        ✓  provenance wraps bold
 **%a{the important}** point        ✗  bold wraps provenance (discouraged)
-%h{see [this link](url) for more}  ✓  provenance wraps links
+%u{see [this link](url) for more}  ✓  provenance wraps links
 ```
 
 A conforming parser SHOULD process provenance spans before inline emphasis and link parsing.
@@ -88,7 +99,7 @@ Backtick-fenced code spans inside provenance markers are treated normally. The p
 Provenance spans MAY nest. A nested span overrides the provenance of the outer span for its content:
 
 ```markdown
-%a{The model produced this paragraph, but %h{I corrected this clause} before publishing.}
+%a{The model produced this paragraph, but %u{I corrected this clause} before publishing.}
 ```
 
 Nesting depth SHOULD NOT exceed 3 in practice. Parsers MUST support at least 2 levels of nesting.
@@ -99,19 +110,21 @@ Brace matching follows standard rules: the parser counts opens and closes, and t
 
 ## 5. Block Syntax
 
+> **Implementation status:** Block syntax is specified here but not yet implemented in the Obsidian plugin. It is reserved for a future release.
+
 When an entire block (paragraph, list item, code fence, blockquote) has a single provenance, a block marker avoids repetitive inline tagging.
 
 ### 5.1 Form
 
-A block marker is a provenance prefix followed by a `>` and a space, placed on its own line before the block:
+A block marker is a sigil followed by `>` and a space, placed on its own line before the block:
 
 ```markdown
 %a>
-This entire paragraph was generated by an AI model. It may contain
+This entire paragraph was generated by an AI assistant. It may contain
 multiple sentences spanning several lines.
 
-%o>
-This paragraph was written by a collaborator.
+%q>
+This paragraph was copied from an external source.
 ```
 
 The block marker applies to all content until the next blank line (standard Markdown paragraph break) or until the next block marker, whichever comes first.
@@ -122,15 +135,15 @@ For multiple consecutive blocks under the same provenance, use a fenced form wit
 
 ```markdown
 %%%a
-This is paragraph one from the AI.
+This is paragraph one from the assistant.
 
-This is paragraph two from the AI.
+This is paragraph two from the assistant.
 
-- This list is also from the AI
+- This list is also from the assistant
 %%%
 ```
 
-The opening fence is `%%%` followed by a provenance letter. The closing fence is `%%%` alone on a line. This mirrors the fenced code block pattern (```` ``` ````), keeping the syntax memorable.
+The opening fence is `%%%` followed by a provenance sigil letter. The closing fence is `%%%` alone on a line. This mirrors the fenced code block pattern (```` ``` ````), keeping the syntax memorable.
 
 ### 5.3 Block with Inline Overrides
 
@@ -138,14 +151,14 @@ Block-level provenance serves as the local default. Inline markers inside a bloc
 
 ```markdown
 %a>
-The model wrote this sentence. %h{I inserted this correction.} The model continued here.
+The assistant wrote this sentence. %u{I inserted this correction.} The assistant continued here.
 ```
 
 ---
 
 ## 6. Escaping
 
-MPE follows standard Markdown backslash-escaping conventions. To produce a literal provenance prefix without triggering a span, escape the `%`:
+MDP follows standard Markdown backslash-escaping conventions. To produce a literal provenance sigil without triggering a span, escape the `%`:
 
 ```markdown
 The value was \%a{not a provenance span}.
@@ -157,7 +170,7 @@ To include a literal `}` inside a provenance span:
 %a{the set \{1, 2, 3\} is finite}
 ```
 
-A `%` followed by a character other than `a`, `h`, `o`, or `?` is never a provenance marker and requires no escaping:
+A `%` followed by a character other than `a`, `u`, `q`, or `?` is never a provenance marker and requires no escaping:
 
 ```markdown
 The price increased by %12.     (not a marker, no escaping needed)
@@ -172,12 +185,12 @@ Encoded as %20 in URLs.         (not a marker)
 
 Conforming renderers SHOULD distinguish provenance spans visually. The recommended defaults:
 
-| Type | Suggested Default                  |
-|------|------------------------------------|
-| `%a` | Light background tint (e.g. blue)  |
-| `%h` | No decoration (matches body text)  |
-| `%o` | Light background tint (e.g. green) |
-| `%?` | Light background tint (e.g. amber) |
+| Type | Suggested Default                   |
+|------|-------------------------------------|
+| `%a` | Light background tint (e.g. blue)   |
+| `%u` | No decoration (matches body text)   |
+| `%q` | Light background tint (e.g. green)  |
+| `%?` | Light background tint (e.g. amber)  |
 
 If the document's default provenance matches a span's type, the span SHOULD render without decoration (it is redundant).
 
@@ -194,7 +207,10 @@ Renderers SHOULD allow users to:
 When rendering to HTML, conforming renderers SHOULD emit a `<span>` (inline) or `<div>` (block) with a `data-provenance` attribute:
 
 ```html
-<span data-provenance="ai">AI-generated text here</span>
+<span data-provenance="assistant">AI-generated text here</span>
+<span data-provenance="user">My own writing</span>
+<span data-provenance="external">Quoted from a source</span>
+<span data-provenance="unknown">Unclear origin</span>
 ```
 
 This enables CSS-only styling and downstream tooling.
@@ -205,19 +221,19 @@ This enables CSS-only styling and downstream tooling.
 
 The following features are explicitly deferred but the syntax is designed to accommodate them without breaking changes:
 
-**Attributes.** A parenthetical attribute list between the prefix and the opening brace:
+**Named contributors.** Dot-chain syntax for identifying specific users: `%u.david{text}`. Reserved but undefined. This allows `%u` to scale naturally from single-author to multi-author documents without a new sigil.
+
+**Attributes.** A parenthetical attribute list between the sigil and the opening brace:
 
 ```markdown
 %a(model=gpt-4o, conf=0.92){generated text}
 ```
 
-This slot is currently undefined. Parsers encountering `(...)` between a prefix and `{` in this version SHOULD either ignore the attributes and parse the span, or reject the construct — they MUST NOT misparse it.
+This slot is currently undefined. Parsers encountering `(...)` between a sigil and `{` in this version SHOULD either ignore the attributes and parse the span, or reject the construct — they MUST NOT misparse it.
 
 **Timestamps.** Could use the attribute slot: `%a(t=2025-03-14T10:00Z){text}`.
 
 **Tooltips / Hover.** Renderers may choose to display provenance type (and future attributes) on hover. Not specified in this version.
-
-**Named authors.** Dot-chain syntax for identifying specific contributors: `%o.daniel{text}`. Reserved but undefined.
 
 ---
 
@@ -225,21 +241,21 @@ This slot is currently undefined. Parsers encountering `(...)` between a prefix 
 
 ### 9.1 Obsidian Plugin (Target Platform)
 
-Obsidian uses a CodeMirror 6 editor with a custom Markdown parser pipeline. The recommended implementation path:
+Obsidian uses a CodeMirror 6 editor with a custom Markdown parser pipeline. The implemented approach:
 
-1. **CodeMirror syntax extension** — register a new inline syntax node for provenance spans in the CM6 `MarkdownConfig`. This is the most robust approach: it makes provenance spans first-class in the editor's syntax tree, enabling highlighting, folding, and decoration.
+1. **CodeMirror decorator (Live Preview)** — a `ViewPlugin` scans visible text for MDP span syntax and applies `Decoration.mark()` for each matched range. Syntax delimiters are hidden when the cursor is outside the span.
 
-2. **Markdown post-processor** — for reading mode, register a `MarkdownPostProcessorAPI` callback that matches provenance syntax in rendered output and wraps it in styled `<span>` elements.
+2. **Markdown post-processor (Reading mode)** — a `MarkdownPostProcessorAPI` callback matches provenance syntax in rendered output and wraps it in styled `<span>` elements with `data-provenance` attributes.
 
-3. **CSS snippet** — ship default styles as a snippet, allowing users to override via Obsidian's native CSS customization.
+3. **Dynamic CSS** — colors are injected as CSS custom properties at load time and updated live when the user changes them in settings. Separate opacity values apply for light and dark Obsidian themes.
 
-Starting with the post-processor alone (step 2) is viable as an MVP — it covers reading mode without touching the editor internals. The CM6 extension (step 1) can follow.
+**Plugin-level default:** In addition to document frontmatter, the plugin has a configurable default provenance that applies to notes without a `provenance` frontmatter key. Setting it to `"user"` makes all unmarked text in user-authored vaults render without decoration by default.
 
 ### 9.2 General Parser Integration
 
 For standalone or general-purpose Markdown parsers (e.g. markdown-it, remark, unified):
 
-- MPE inline spans should be parsed at the same priority level as links and images — after code spans, before emphasis.
+- MDP inline spans should be parsed at the same priority level as links and images — after code spans, before emphasis.
 - Block markers (`%a>`, `%%%a`) should be parsed at the block level, before paragraph assembly.
 - The parser should expose provenance as AST metadata, not as a separate tree, so downstream transforms (e.g. HTML rendering) can access it naturally.
 
@@ -247,7 +263,7 @@ For standalone or general-purpose Markdown parsers (e.g. markdown-it, remark, un
 
 ## 10. Conformance
 
-A **conforming writer** emits only the syntax described in §4–5, uses only the four defined prefixes, and respects escaping rules in §6.
+A **conforming writer** emits only the syntax described in §4–5, uses only the four defined sigils, and respects escaping rules in §6.
 
 A **conforming parser** recognizes inline and block syntax, supports at least 2 levels of nesting, handles escaping, and exposes provenance as structured data (AST nodes or HTML attributes).
 
@@ -258,21 +274,21 @@ A **conforming renderer** produces visually distinguishable output per §7.1 or 
 ## Appendix A: Grammar (Informative)
 
 ```
-provenance-prefix  = "%" ("a" / "h" / "o" / "?")
-inline-span        = provenance-prefix "{" content "}"
+provenance-sigil   = "%" ("a" / "u" / "q" / "?")
+inline-span        = provenance-sigil "{" content "}"
 content            = *(inline-span / escaped-char / text)
 escaped-char       = "\" ("%" / "{" / "}")
-block-single       = provenance-prefix ">" newline paragraph
+block-single       = provenance-sigil ">" newline paragraph
 block-fenced       = "%%%" provenance-letter newline blocks "%%%" newline
 ```
 
 ## Appendix B: Examples
 
-### Mostly-human document with AI insertions
+### Mostly-user document with AI insertions
 
 ```markdown
 ---
-provenance: human
+provenance: user
 ---
 
 # Quarterly Report
@@ -281,26 +297,26 @@ Revenue grew 12% year-over-year. %a{This growth was primarily driven by
 expansion in the APAC region, which saw a 23% increase in new customer
 acquisition.} We plan to continue investing in this market.
 
-%o.daniel{The engineering team shipped 14 features this quarter, a new record.}
+%q{The engineering team shipped 14 features this quarter, a new record.}
 ```
 
-### AI-generated document with human review
+### AI-generated document with user review
 
 ```markdown
 ---
-provenance: ai
+provenance: assistant
 ---
 
 # API Reference
 
 The `/users` endpoint accepts GET and POST requests.
 
-%h{Note: rate limiting was increased to 1000 req/min as of March 2025.}
+%u{Note: rate limiting was increased to 1000 req/min as of March 2025.}
 
-%%%h
+%%%u
 ## Changelog
 
 This section is maintained manually by the engineering team.
-All entries below are written by humans.
+All entries below are written by users.
 %%%
 ```

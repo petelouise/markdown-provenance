@@ -3,26 +3,37 @@
  * Imported by renderer.ts, livePreview.ts, settings.ts, and settingsTab.ts.
  */
 
-export type ProvenanceWord   = "assistant" | "self" | "quote" | "unknown";
-export type ProvenanceLetter = "a" | "s" | "q" | "u";
+export type ProvenanceWord   = "assistant" | "user" | "external" | "unknown";
+export type ProvenanceLetter = "a" | "u" | "q" | "?" | "s";
 
 export const LETTER_TO_WORD: Record<ProvenanceLetter, ProvenanceWord> = {
-	a: "assistant",
-	s: "self",
-	q: "quote",
-	u: "unknown",
+	a:   "assistant",
+	u:   "user",       // canonical user sigil
+	q:   "external",
+	"?": "unknown",
+	s:   "user",       // backward-compat alias for old %s (self)
+};
+
+/** Reverse map: canonical word → canonical sigil letter (for inserting new spans). */
+export const WORD_TO_LETTER: Record<ProvenanceWord, string> = {
+	assistant: "a",
+	user:      "u",
+	external:  "q",
+	unknown:   "?",
 };
 
 /** Accepts canonical names + legacy/shorthand aliases. Case-insensitive. */
 const ALIASES: Record<string, ProvenanceWord> = {
 	// canonical
 	assistant: "assistant",
-	self:      "self",
-	quote:     "quote",
+	user:      "user",
+	external:  "external",
 	unknown:   "unknown",
 	// aliases
 	ai:        "assistant",   // shorthand
-	human:     "self",        // original spec term
+	human:     "user",        // original spec term
+	self:      "user",        // previous plugin term
+	quote:     "external",    // previous plugin term
 };
 
 /**

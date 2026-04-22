@@ -4,6 +4,7 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 import { normalizeProvenance } from "./provenance";
 import { processElement } from "./renderer";
 import { buildLivePreviewExtension } from "./livePreview";
+import { buildAutoRemarkExtension } from "./autoRemark";
 import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCSS } from "./settings";
 import { MDPSettingTab } from "./settingsTab";
 
@@ -18,6 +19,9 @@ export default class MDPPlugin extends Plugin {
 
 		// Live Preview (CodeMirror 6) — pass plugin as context
 		this.registerEditorExtension(buildLivePreviewExtension(this));
+
+		// Auto-remark: wrap user insertions in %u{...} when they edit non-user content
+		this.registerEditorExtension(buildAutoRemarkExtension(this));
 
 		// Reading mode
 		this.registerMarkdownPostProcessor((el, ctx) => {
@@ -55,10 +59,22 @@ export default class MDPPlugin extends Plugin {
 	}
 
 	async loadSettings() {
+		// Load raw data first so we can migrate old key names before merging
+		const raw: Record<string, unknown> = (await this.loadData()) ?? {};
+
+		// One-time migration: self → user, quote → external (v0.1 → v0.2)
+		if (raw.colors && typeof raw.colors === "object") {
+			const c = raw.colors as Record<string, unknown>;
+			if ("self" in c && !("user" in c))         c.user     = c.self;
+			if ("quote" in c && !("external" in c))    c.external = c.quote;
+		}
+		if (raw.pluginDefault === "self")  raw.pluginDefault = "user";
+		if (raw.pluginDefault === "quote") raw.pluginDefault = "external";
+
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			await this.loadData() as Partial<MDPSettings>
+			raw as Partial<MDPSettings>
 		);
 		// Deep-merge nested colors so missing keys fall back to defaults
 		this.settings.colors = Object.assign(

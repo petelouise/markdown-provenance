@@ -129,7 +129,7 @@ function findSpans(text: string, offset: number, out: SpanRange[]): void {
 		if (
 			text[i] === "%" &&
 			i + 2 < text.length &&
-			"asqu".includes(text[i + 1] ?? "") &&
+			"auqs?".includes(text[i + 1] ?? "") &&
 			text[i + 2] === "{"
 		) {
 			const sigil    = text[i + 1] as ProvenanceLetter;

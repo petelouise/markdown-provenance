@@ -1,7 +1,8 @@
 /**
  * MDP inline provenance parser.
  *
- * Recognises spans of the form  %a{...}  %s{...}  %q{...}  %u{...}
+ * Recognises spans of the form  %a{...}  %u{...}  %q{...}  %?{...}
+ * Also accepts %s{...} as a backward-compat alias for %u (user).
  * Handles:
  *   - Nesting: %a{outer %s{inner} back}
  *   - Escaping: \% → literal %, \} → literal } inside a span
@@ -9,13 +10,13 @@
  *   - Code spans (backticks) → passed through verbatim, no provenance parsing inside
  */
 
-export type ProvenanceLetter = "a" | "s" | "q" | "u";
+export type ProvenanceLetter = "a" | "u" | "q" | "?" | "s";
 
 export type Segment =
   | { kind: "text"; content: string }
   | { kind: "span"; provenance: ProvenanceLetter; children: Segment[] };
 
-const KNOWN_SIGILS = new Set<string>(["a", "s", "q", "u"]);
+const KNOWN_SIGILS = new Set<string>(["a", "u", "q", "?", "s"]);
 
 /**
  * Parse a string into a flat-or-nested list of Segments.

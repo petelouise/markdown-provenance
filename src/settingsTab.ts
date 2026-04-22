@@ -28,10 +28,10 @@ export class MDPSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 
-		this.addColorSetting("Self",      "Your own writing  (%s{...})",               "self");
+		this.addColorSetting("User",      "Your own writing  (%u{...})",               "user");
 		this.addColorSetting("Assistant", "AI-generated text  (%a{...})",              "assistant");
-		this.addColorSetting("Quote",     "Third-party source  (%q{...})",             "quote");
-		this.addColorSetting("Unknown",   "Unclear provenance  (%u{...})",             "unknown");
+		this.addColorSetting("External",  "Third-party source  (%q{...})",             "external");
+		this.addColorSetting("Unknown",   "Unclear provenance  (%?{...})",             "unknown");
 
 		// ── Default provenance ────────────────────────────────────────────────
 		containerEl.createEl("h3", { text: "Default provenance" });
@@ -48,9 +48,9 @@ export class MDPSettingTab extends PluginSettingTab {
 			.addDropdown(drop => {
 				drop
 					.addOption("none",      "None — tint everything")
-					.addOption("self",      "Self")
+					.addOption("user",      "User")
 					.addOption("assistant", "Assistant")
-					.addOption("quote",     "Quote")
+					.addOption("external",  "External")
 					.addOption("unknown",   "Unknown")
 					.setValue(this.plugin.settings.pluginDefault)
 					.onChange(async (value) => {

@@ -3,8 +3,8 @@ import { ProvenanceWord } from "./provenance";
 export interface MDPSettings {
 	colors: {
 		assistant: string;
-		self:      string;   // neutral blue-grey by default; configurable
-		quote:     string;
+		user:      string;   // neutral blue-grey by default; configurable
+		external:  string;
 		unknown:   string;
 	};
 	/** Rendering fallback for notes without frontmatter; also used for new-note auto-insert. */
@@ -16,11 +16,11 @@ export interface MDPSettings {
 export const DEFAULT_SETTINGS: MDPSettings = {
 	colors: {
 		assistant: "#6495ed",
-		self:      "#a0a0b0",   // neutral blue-grey — subtle baseline
-		quote:     "#3cb371",
+		user:      "#a0a0b0",   // neutral blue-grey — subtle baseline
+		external:  "#3cb371",
 		unknown:   "#ffc107",
 	},
-	pluginDefault: "self",         // most vaults are self-authored
+	pluginDefault: "user",         // most vaults are user-authored
 	autoInsertFrontmatter: false,  // opt-in only
 };
 
@@ -46,15 +46,15 @@ export function buildDynamicCSS(settings: MDPSettings): string {
 	const c = settings.colors;
 	const fb = DEFAULT_SETTINGS.colors;
 
-	const vars = (alpha: { assistant: number; self: number; quote: number; unknown: number }) => `
+	const vars = (alpha: { assistant: number; user: number; external: number; unknown: number }) => `
   --mdp-color-assistant: ${hexToRgba(c.assistant ?? fb.assistant, alpha.assistant)};
-  --mdp-color-self:      ${hexToRgba(c.self      ?? fb.self,      alpha.self)};
-  --mdp-color-quote:     ${hexToRgba(c.quote     ?? fb.quote,     alpha.quote)};
+  --mdp-color-user:      ${hexToRgba(c.user      ?? fb.user,      alpha.user)};
+  --mdp-color-external:  ${hexToRgba(c.external  ?? fb.external,  alpha.external)};
   --mdp-color-unknown:   ${hexToRgba(c.unknown   ?? fb.unknown,   alpha.unknown)};`.trimEnd();
 
 	return `
-body.theme-light {${vars({ assistant: 0.18, self: 0.15, quote: 0.18, unknown: 0.22 })}
+body.theme-light {${vars({ assistant: 0.18, user: 0.15, external: 0.18, unknown: 0.22 })}
 }
-body.theme-dark {${vars({ assistant: 0.28, self: 0.22, quote: 0.26, unknown: 0.32 })}
+body.theme-dark {${vars({ assistant: 0.28, user: 0.22, external: 0.26, unknown: 0.32 })}
 }`.trim();
 }

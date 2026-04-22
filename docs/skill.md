@@ -59,9 +59,9 @@ Spans can be nested. Inner provenance overrides outer:
 
 ### Block markers
 
-When an entire paragraph has a single provenance, prefix every line with `%X> ` (like Markdown's `>` blockquote syntax). The block continues as long as consecutive lines carry the same prefix; a blank line or a line without the prefix ends it.
+When an entire paragraph has a single provenance, prefix every line with `%X>` followed by a space (like Markdown's `>` blockquote syntax). The block continues as long as consecutive lines carry the same prefix; a blank line or a line without the prefix ends it.
 
-```
+```markdown
 %a> This entire paragraph is AI-generated.
 
 %a> This one too.
@@ -72,7 +72,7 @@ When an entire paragraph has a single provenance, prefix every line with `%X> ` 
 
 For multi-paragraph regions under the same provenance, use a fenced form:
 
-```
+```markdown
 %%%a
 This is AI paragraph one.
 
@@ -82,7 +82,7 @@ This is AI paragraph two. Still inside the fence.
 
 The closing `%%%` (alone on a line) ends the fence regardless of the opening sigil. Inline spans inside a block or fence still work and override the block provenance for their span:
 
-```
+```markdown
 %a> The assistant wrote this. %u{I inserted this correction.} The assistant continued.
 ```
 

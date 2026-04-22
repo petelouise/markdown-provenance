@@ -26,11 +26,29 @@ export { normalizeProvenance };
 // Block-marker regexes
 // ---------------------------------------------------------------------------
 
-const BLOCK_LINE_RE = /^%(a|u|q|\?)> ?/;
+// Space after > is required — %a>text (no space) is not a valid block marker.
+const BLOCK_LINE_RE = /^%(a|u|q|\?)> /;
 const FENCE_OPEN_RE = /^%%%([auq?])$/;
 const FENCE_CLOSE_RE = /^%%%$/;
 
 type BlockSigil = "a" | "u" | "q" | "?";
+
+// Pre-built per-sigil regexes — avoids per-call RegExp allocation.
+// SIGIL_LINE_RE: anchored (no g flag) — safe for .test() calls.
+// SIGIL_MID_RE:  global — safe for .replace() calls (replace() resets lastIndex).
+const SIGIL_LINE_RE: Readonly<Record<BlockSigil, RegExp>> = {
+	a:   /^%a> /,
+	u:   /^%u> /,
+	q:   /^%q> /,
+	"?": /^%\?> /,
+};
+
+const SIGIL_MID_RE: Readonly<Record<BlockSigil, RegExp>> = {
+	a:   / %a> /g,
+	u:   / %u> /g,
+	q:   / %q> /g,
+	"?": / %\?> /g,
+};
 
 interface FenceState {
 	sigil: BlockSigil;
@@ -38,7 +56,15 @@ interface FenceState {
 }
 
 // Module-level state: one active fence per source path at a time.
+// Relies on Obsidian calling post-processors in document order (top to bottom).
+// Call clearFences() from the plugin's onunload() to avoid accumulating
+// stale entries from renamed or deleted files.
 const activeFences = new Map<string, FenceState>();
+
+/** Release all fence state — call from the plugin's onunload(). */
+export function clearFences(): void {
+	activeFences.clear();
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -67,7 +93,7 @@ export function processElement(
 	}
 
 	// Block markers
-	processLineBlock(el, def);
+	processLineBlock(el, def, sourcePath);
 	processFencedBlock(el, def, sourcePath);
 }
 
@@ -129,7 +155,15 @@ function buildFragment(
 // Per-line block markers: %a> text
 // ---------------------------------------------------------------------------
 
-function processLineBlock(el: HTMLElement, def: ProvenanceWord | null): void {
+function processLineBlock(
+	el: HTMLElement,
+	def: ProvenanceWord | null,
+	sourcePath: string,
+): void {
+	// Skip if this section is already claimed by an open fenced block — the
+	// fence's provenance is authoritative and we don't want double-styling.
+	if (sourcePath && activeFences.has(sourcePath)) return;
+
 	const paras: HTMLElement[] =
 		el.tagName === "P"
 			? [el]
@@ -143,7 +177,7 @@ function processLineBlock(el: HTMLElement, def: ProvenanceWord | null): void {
 
 /**
  * Returns the block sigil if every non-empty "line" of the paragraph starts
- * with the same %X> prefix, otherwise null.
+ * with the same %X> prefix (space required), otherwise null.
  *
  * Handles two Obsidian line-break modes:
  *   - <br>-separated lines (strict line breaks enabled)
@@ -164,9 +198,8 @@ function detectLineBlockSigil(p: HTMLElement): BlockSigil | null {
 	if (!match) return null;
 	const sigil = match[1] as BlockSigil;
 
-	// All non-empty lines must start with the same sigil
-	const safeS = sigil === "?" ? "\\?" : sigil;
-	const lineRe = new RegExp(`^%${safeS}> ?`);
+	// All non-empty lines must start with the same sigil (using pre-built regex)
+	const lineRe = SIGIL_LINE_RE[sigil];
 	const allMatch = text
 		.split("\n")
 		.every((line) => line.trim() === "" || lineRe.test(line));
@@ -193,10 +226,8 @@ function applyLineBlock(
 }
 
 function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
-	const safeS = sigil === "?" ? "\\?" : sigil;
-	const startRe = new RegExp(`^%${safeS}> ?`);
-	// Space-joined mode: " %X> " in the middle of a single text node
-	const midRe = new RegExp(` %${safeS}> ?`, "g");
+	const startRe = SIGIL_LINE_RE[sigil];
+	const midRe   = SIGIL_MID_RE[sigil];
 
 	let afterLineStart = true;
 	for (const node of Array.from(el.childNodes) as ChildNode[]) {
@@ -206,6 +237,7 @@ function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
 				text = text.replace(startRe, "");
 				afterLineStart = false;
 			}
+			// Space-joined mode: " %X> " in the middle of a single text node
 			text = text.replace(midRe, " ");
 			node.textContent = text;
 		} else if ((node as Element).tagName === "BR") {
@@ -218,17 +250,29 @@ function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
 // Fenced block markers: %%%a … %%%
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns true only when el is (or wraps) a single paragraph whose sole text
+ * content could be a fence marker — prevents false positives on containers.
+ */
+function isFenceCandidate(el: HTMLElement): boolean {
+	if (el.tagName === "P") return true;
+	if (el.children.length === 1 && (el.children[0] as HTMLElement).tagName === "P") return true;
+	// Bare text node with no element children (unusual but possible)
+	if (el.children.length === 0 && el.childNodes.length > 0) return true;
+	return false;
+}
+
 function processFencedBlock(
 	el: HTMLElement,
 	def: ProvenanceWord | null,
 	sourcePath: string,
 ): void {
 	if (!sourcePath) return;
-	const text = el.textContent?.trim() ?? "";
 	const fence = activeFences.get(sourcePath);
+	const text = el.textContent?.trim() ?? "";
 
 	// Closing fence: apply provenance to all collected elements
-	if (fence && FENCE_CLOSE_RE.test(text)) {
+	if (fence && isFenceCandidate(el) && FENCE_CLOSE_RE.test(text)) {
 		const word = LETTER_TO_WORD[fence.sigil];
 		for (const fenceEl of fence.elements) {
 			fenceEl.classList.add("mdp-block");
@@ -246,11 +290,13 @@ function processFencedBlock(
 		return;
 	}
 
-	// Opening fence: begin tracking
-	const openMatch = text.match(FENCE_OPEN_RE);
-	if (openMatch) {
-		const sigil = openMatch[1] as BlockSigil;
-		activeFences.set(sourcePath, { sigil, elements: [] });
-		el.style.display = "none";
+	// Opening fence: begin tracking (overwrites any stale prior state for this path)
+	if (isFenceCandidate(el)) {
+		const openMatch = text.match(FENCE_OPEN_RE);
+		if (openMatch) {
+			const sigil = openMatch[1] as BlockSigil;
+			activeFences.set(sourcePath, { sigil, elements: [] });
+			el.style.display = "none";
+		}
 	}
 }

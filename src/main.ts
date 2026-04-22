@@ -2,7 +2,7 @@ import { Plugin, TFile } from "obsidian";
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 import { normalizeProvenance } from "./provenance";
-import { processElement } from "./renderer";
+import { processElement, clearFences } from "./renderer";
 import { buildLivePreviewExtension } from "./livePreview";
 import { buildAutoRemarkExtension } from "./autoRemark";
 import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCSS } from "./settings";
@@ -56,6 +56,7 @@ export default class MDPPlugin extends Plugin {
 
 	onunload() {
 		document.getElementById(STYLE_EL_ID)?.remove();
+		clearFences();
 	}
 
 	async loadSettings() {

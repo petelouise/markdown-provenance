@@ -10,13 +10,15 @@ Ideas deferred from the current implementation. In rough priority order.
 Separate tint opacities for Obsidian's light and dark themes via
 `body.theme-light` / `body.theme-dark` CSS scoping.
 
-### Block markers
-Support block-level provenance, as specified in `mdp-spec.md`:
-- `%a>` — a single paragraph block (blockquote-style)
-- `%%%a` / `%%%` — fenced block for multi-paragraph regions
+### Block markers ✅
+Reading mode (post-processor) implemented: `%a>` per-line blocks and `%%%a`/`%%%` fenced blocks.
+See `mdp-spec.md` §5 for the full spec.
 
-Reading mode post-processor can handle these without CM6.
-Live preview would need additional CM6 work.
+### Block markers — live preview (CM6)
+Live preview support for block markers is deferred. Inline spans already work
+in the editor; block markers show as raw text in editing mode and render correctly
+when switching to Reading view. CM6 block-level decorations require a different
+API (`Decoration.line()`) than the inline `Decoration.mark()` currently in use.
 
 ### Provenance summary / statistics
 Status bar item or side panel showing a breakdown of the current note:

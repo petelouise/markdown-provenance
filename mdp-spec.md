@@ -279,7 +279,7 @@ provenance-sigil   = "%" ("a" / "u" / "q" / "?")
 inline-span        = provenance-sigil "{" content "}"
 content            = *(inline-span / escaped-char / text)
 escaped-char       = "\" ("%" / "{" / "}")
-block-line         = 1*(provenance-sigil ">" SP text newline)
+block-line         = 1*(provenance-sigil ">" [SP] text newline)
 block-fenced       = "%%%" provenance-letter newline blocks "%%%" newline
 ```
 

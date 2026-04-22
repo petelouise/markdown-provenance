@@ -26,8 +26,9 @@ export { normalizeProvenance };
 // Block-marker regexes
 // ---------------------------------------------------------------------------
 
-// Space after > is required — %a>text (no space) is not a valid block marker.
-const BLOCK_LINE_RE = /^%(a|u|q|\?)> /;
+// Space after > is optional, matching CommonMark's blockquote rule (both
+// `> text` and `>text` are valid). The regex mirrors that behaviour.
+const BLOCK_LINE_RE = /^%(a|u|q|\?)> ?/;
 const FENCE_OPEN_RE = /^%%%([auq?])$/;
 const FENCE_CLOSE_RE = /^%%%$/;
 
@@ -37,17 +38,17 @@ type BlockSigil = "a" | "u" | "q" | "?";
 // SIGIL_LINE_RE: anchored (no g flag) — safe for .test() calls.
 // SIGIL_MID_RE:  global — safe for .replace() calls (replace() resets lastIndex).
 const SIGIL_LINE_RE: Readonly<Record<BlockSigil, RegExp>> = {
-	a:   /^%a> /,
-	u:   /^%u> /,
-	q:   /^%q> /,
-	"?": /^%\?> /,
+	a:   /^%a> ?/,
+	u:   /^%u> ?/,
+	q:   /^%q> ?/,
+	"?": /^%\?> ?/,
 };
 
 const SIGIL_MID_RE: Readonly<Record<BlockSigil, RegExp>> = {
-	a:   / %a> /g,
-	u:   / %u> /g,
-	q:   / %q> /g,
-	"?": / %\?> /g,
+	a:   / %a> ?/g,
+	u:   / %u> ?/g,
+	q:   / %q> ?/g,
+	"?": / %\?> ?/g,
 };
 
 interface FenceState {

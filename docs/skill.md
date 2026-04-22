@@ -59,7 +59,7 @@ Spans can be nested. Inner provenance overrides outer:
 
 ### Block markers
 
-When an entire paragraph has a single provenance, prefix every line with `%X>` followed by a space (like Markdown's `>` blockquote syntax). The block continues as long as consecutive lines carry the same prefix; a blank line or a line without the prefix ends it.
+When an entire paragraph has a single provenance, prefix every line with `%X>` (space after `>` is optional, matching Markdown's blockquote rule). The block continues as long as consecutive lines carry the same prefix; a blank line or a line without the prefix ends it.
 
 ```markdown
 %a> This entire paragraph is AI-generated.

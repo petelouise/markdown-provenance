@@ -28,10 +28,31 @@ export class MDPSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 
-		this.addColorSetting("User",      "Your own writing  (%u{...})",               "user");
-		this.addColorSetting("Assistant", "AI-generated text  (%a{...})",              "assistant");
-		this.addColorSetting("External",  "Third-party source  (%q{...})",             "external");
-		this.addColorSetting("Unknown",   "Unclear provenance  (%?{...})",             "unknown");
+		new Setting(containerEl)
+			.setName("Separate dark mode colours")
+			.setDesc("Set different tints for Obsidian's light and dark themes.")
+			.addToggle(toggle => {
+				toggle
+					.setValue(this.plugin.settings.separateDarkMode)
+					.onChange(async (value) => {
+						if (value === this.plugin.settings.separateDarkMode) return;
+						if (value && !this.plugin.settings.darkColors) {
+							this.plugin.settings.darkColors = { ...this.plugin.settings.colors };
+						}
+						this.plugin.settings.separateDarkMode = value;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+
+		if (this.plugin.settings.separateDarkMode && !this.plugin.settings.darkColors) {
+			this.plugin.settings.darkColors = { ...this.plugin.settings.colors };
+		}
+		const dm = this.plugin.settings.separateDarkMode;
+		this.addColorSetting("User",      "Your own writing  (%u{...})",               "user",      dm);
+		this.addColorSetting("Assistant", "AI-generated text  (%a{...})",              "assistant", dm);
+		this.addColorSetting("External",  "Third-party source  (%q{...})",             "external",  dm);
+		this.addColorSetting("Unknown",   "Unclear provenance  (%?{...})",             "unknown",   dm);
 
 		// ── Default provenance ────────────────────────────────────────────────
 		containerEl.createEl("h3", { text: "Default provenance" });
@@ -83,22 +104,47 @@ export class MDPSettingTab extends PluginSettingTab {
 	private addColorSetting(
 		name: string,
 		desc: string,
-		key: keyof MDPSettings["colors"]
+		key: keyof MDPSettings["colors"],
+		darkMode: boolean
 	): void {
-		new Setting(this.containerEl)
+		const setting = new Setting(this.containerEl)
 			.setName(name)
-			.setDesc(desc)
-			.addText((text) => {
-				text.inputEl.type = "color";
-				text.inputEl.value = this.plugin.settings.colors[key];
-				text.inputEl.style.width  = "4rem";
+			.setDesc(desc);
+
+		if (darkMode) {
+			setting.controlEl.createSpan({ text: "☀", attr: { title: "Light mode" } });
+		}
+
+		// Primary (light / unified) colour picker
+		setting.addText((text) => {
+			text.inputEl.type    = "color";
+			text.inputEl.value   = this.plugin.settings.colors[key];
+			text.inputEl.style.width   = "4rem";
+			text.inputEl.style.padding = "0";
+			text.inputEl.style.cursor  = "pointer";
+			if (darkMode) text.inputEl.style.marginRight = "0.5rem";
+			text.inputEl.addEventListener("input", async () => {
+				this.plugin.settings.colors[key] = text.inputEl.value;
+				await this.plugin.saveSettings();
+				this.plugin.applyStyles();
+			});
+		});
+
+		if (darkMode) {
+			setting.controlEl.createSpan({ text: "☾", attr: { title: "Dark mode" } });
+
+			setting.addText((text) => {
+				text.inputEl.type    = "color";
+				text.inputEl.value   = this.plugin.settings.darkColors![key];
+				text.inputEl.style.width   = "4rem";
 				text.inputEl.style.padding = "0";
 				text.inputEl.style.cursor  = "pointer";
 				text.inputEl.addEventListener("input", async () => {
-					this.plugin.settings.colors[key] = text.inputEl.value;
+					this.plugin.settings.darkColors![key] = text.inputEl.value;
 					await this.plugin.saveSettings();
 					this.plugin.applyStyles();
 				});
 			});
+		}
 	}
 }

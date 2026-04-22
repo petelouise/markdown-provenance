@@ -3,25 +3,38 @@ import { ProvenanceWord } from "./provenance";
 export interface MDPSettings {
 	colors: {
 		assistant: string;
-		user:      string;   // neutral blue-grey by default; configurable
+		user:      string;
 		external:  string;
 		unknown:   string;
 	};
-	/** Rendering fallback for notes without frontmatter; also used for new-note auto-insert. */
+	/**
+	 * Optional per-type colours for Obsidian's dark theme.
+	 * Only used when separateDarkMode is true.
+	 * Absent means dark theme falls back to colors.
+	 */
+	darkColors?: {
+		assistant: string;
+		user:      string;
+		external:  string;
+		unknown:   string;
+	};
+	/** When true, dark theme uses darkColors instead of colors. */
+	separateDarkMode: boolean;
 	pluginDefault: ProvenanceWord | "none";
-	/** When true, new .md files automatically get a frontmatter provenance key. */
 	autoInsertFrontmatter: boolean;
 }
 
 export const DEFAULT_SETTINGS: MDPSettings = {
 	colors: {
 		assistant: "#6495ed",
-		user:      "#a0a0b0",   // neutral blue-grey — subtle baseline
+		user:      "#a0a0b0",
 		external:  "#3cb371",
 		unknown:   "#ffc107",
 	},
-	pluginDefault: "user",         // most vaults are user-authored
-	autoInsertFrontmatter: false,  // opt-in only
+	// darkColors intentionally absent — absent means inherit from colors
+	separateDarkMode: false,
+	pluginDefault: "user",
+	autoInsertFrontmatter: false,
 };
 
 /**
@@ -34,19 +47,15 @@ export function hexToRgba(hex: string, alpha: number): string {
 	return `rgba(${parseInt(match[1], 16)}, ${parseInt(match[2], 16)}, ${parseInt(match[3], 16)}, ${alpha})`;
 }
 
-/**
- * Build the CSS custom-property block injected at runtime.
- * Generates separate values for light and dark themes so tints remain
- * legible regardless of the active Obsidian colour scheme.
- *
- * Light mode uses lighter opacity; dark mode uses slightly higher opacity
- * since the same hue needs more presence against a dark canvas.
- */
 export function buildDynamicCSS(settings: MDPSettings): string {
-	const c = settings.colors;
+	const lightC = settings.colors;
+	const darkC  = (settings.separateDarkMode && settings.darkColors)
+		? settings.darkColors
+		: settings.colors;
 	const fb = DEFAULT_SETTINGS.colors;
 
 	const vars = (
+		c: NonNullable<MDPSettings["darkColors"]>,
 		bg: { assistant: number; user: number; external: number; unknown: number },
 		border: { assistant: number; user: number; external: number; unknown: number },
 	) => `
@@ -61,11 +70,13 @@ export function buildDynamicCSS(settings: MDPSettings): string {
 
 	return `
 body.theme-light {${vars(
+		lightC,
 		{ assistant: 0.18, user: 0.15, external: 0.18, unknown: 0.22 },
 		{ assistant: 0.50, user: 0.40, external: 0.50, unknown: 0.55 },
 	)}
 }
 body.theme-dark {${vars(
+		darkC,
 		{ assistant: 0.28, user: 0.22, external: 0.26, unknown: 0.32 },
 		{ assistant: 0.65, user: 0.55, external: 0.65, unknown: 0.70 },
 	)}

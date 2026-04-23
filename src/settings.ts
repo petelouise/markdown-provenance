@@ -26,7 +26,8 @@ export interface MDPSettings {
 	autoInsertFrontmatter: boolean;
 	statusBarStatsEnabled: boolean;
 	statusBarStatsMode: StatusBarMode;
-	tintVisibility: "always" | "hover";
+	embellishmentVisibility: "always" | "hover";
+	embellishmentHoverScope: "mark" | "section";
 	showRibbonToggle: boolean;
 }
 
@@ -43,7 +44,8 @@ export const DEFAULT_SETTINGS: MDPSettings = {
 	autoInsertFrontmatter: false,
 	statusBarStatsEnabled: true,
 	statusBarStatsMode: "percent",
-	tintVisibility: "hover",
+	embellishmentVisibility: "hover",
+	embellishmentHoverScope: "section",
 	showRibbonToggle: true,
 };
 

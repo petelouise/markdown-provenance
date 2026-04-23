@@ -8,8 +8,8 @@ interface MDPPluginHost {
 	saveSettings(): Promise<void>;
 	applyStyles(): void;
 	updateStatusBar(): Promise<void>;
-	applyTintVisibility(): void;
-	resetTintVisibilityOverride(): void;
+	applyEmbellishmentVisibility(): void;
+	resetEmbellishmentVisibilityOverride(): void;
 	syncRibbonToggle(): void;
 }
 
@@ -26,15 +26,15 @@ export class MDPSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		// ── Colours ───────────────────────────────────────────────────────────
-		containerEl.createEl("h3", { text: "Tint colours" });
+		containerEl.createEl("h3", { text: "Embellishment colours" });
 		containerEl.createEl("p", {
-			text: "Background tint applied to each provenance type. Changes take effect immediately.",
+			text: "Base embellishment colour for each provenance type. Changes take effect immediately.",
 			cls: "setting-item-description",
 		});
 
 		new Setting(containerEl)
 			.setName("Separate dark mode colours")
-			.setDesc("Set different tints for Obsidian's light and dark themes.")
+			.setDesc("Set different embellishment colours for Obsidian's light and dark themes.")
 			.addToggle(toggle => {
 				toggle
 					.setValue(this.plugin.settings.separateDarkMode)
@@ -59,25 +59,45 @@ export class MDPSettingTab extends PluginSettingTab {
 		this.addColorSetting("Unknown",   "Unclear provenance  (%?{...})",             "unknown",   dm);
 
 		// ── Visibility ────────────────────────────────────────────────────────
-		new Setting(containerEl).setName("Tint visibility").setHeading();
+		new Setting(containerEl).setName("Embellishment visibility").setHeading();
 
 		new Setting(containerEl)
-			.setName("Default tint visibility")
+			.setName("Default embellishment visibility")
 			.setDesc(
-				"Choose whether provenance tints are visible while you write, or " +
+				"Choose whether provenance embellishments are visible while you write, or " +
 				"only appear when you hover over marked text. The command palette " +
 				"toggle temporarily flips this behavior."
 			)
 			.addDropdown(drop => {
 				drop
-					.addOption("always", "Always show tints")
+					.addOption("always", "Always show embellishments")
 					.addOption("hover", "Show on hover")
-					.setValue(this.plugin.settings.tintVisibility)
+					.setValue(this.plugin.settings.embellishmentVisibility)
 					.onChange((value) => {
 						void (async () => {
-							this.plugin.settings.tintVisibility = value as MDPSettings["tintVisibility"];
+							this.plugin.settings.embellishmentVisibility = value as MDPSettings["embellishmentVisibility"];
 							await this.plugin.saveSettings();
-							this.plugin.resetTintVisibilityOverride();
+							this.plugin.resetEmbellishmentVisibilityOverride();
+						})();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Hover reveal scope")
+			.setDesc(
+				"Choose whether hover reveals only the hovered mark, or every embellishment " +
+				"in the current markdown section."
+			)
+			.addDropdown(drop => {
+				drop
+					.addOption("mark", "Just the hovered mark")
+					.addOption("section", "Current section")
+					.setValue(this.plugin.settings.embellishmentHoverScope)
+					.onChange((value) => {
+						void (async () => {
+							this.plugin.settings.embellishmentHoverScope = value as MDPSettings["embellishmentHoverScope"];
+							await this.plugin.saveSettings();
+							this.plugin.applyEmbellishmentVisibility();
 						})();
 					});
 			});
@@ -114,7 +134,7 @@ export class MDPSettingTab extends PluginSettingTab {
 			)
 			.addDropdown(drop => {
 				drop
-					.addOption("none",      "None — tint everything")
+					.addOption("none",      "None — embellish everything")
 					.addOption("user",      "User")
 					.addOption("assistant", "Assistant")
 					.addOption("external",  "External")

@@ -6,7 +6,7 @@
  *
  * Also handles block-level markers:
  *   - Per-line: %a> text (each line carries the prefix; rendered as <blockquote>)
- *   - Fenced:   %a>>> … %>>> (tint only, no blockquote indent)
+ *   - Fenced:   %a>>> … %>>> (embellishment only, no blockquote indent)
  */
 
 import { parse, Segment } from "./parser";
@@ -102,10 +102,12 @@ export function processElement(
 	el: HTMLElement,
 	docDefault: ProvenanceWord | null,
 	pluginDefault: MDPSettings["pluginDefault"],
+	hoverScopeId: string,
 	renderKey = "",
 	sectionInfo?: RenderSectionInfo | null,
 ): void {
 	const def = effectiveDefault(docDefault, pluginDefault);
+	applyHoverScope(el, hoverScopeId);
 
 	if (renderKey && sectionInfo?.lineStart === 0) {
 		activeFences.delete(renderKey);
@@ -114,17 +116,17 @@ export function processElement(
 	// Fences may share a rendered paragraph with their content, so strip fence
 	// delimiters before inline processing. Inline spans inside the remaining
 	// fenced content are then parsed normally by the text-node pass below.
-	processFencedBlock(el, def, renderKey);
+	processFencedBlock(el, def, hoverScopeId, renderKey);
 
 	// Inline spans
 	const textNodes = collectTextNodes(el);
 	for (const node of textNodes) {
-		processTextNode(node, def);
+		processTextNode(node, def, hoverScopeId);
 	}
 
 	// Per-line block markers. Fences must be handled first because `%a>>>`
 	// starts with the `%a>` line-marker prefix.
-	processLineBlock(el, def, renderKey);
+	processLineBlock(el, def, hoverScopeId, renderKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,19 +152,24 @@ function collectTextNodes(root: HTMLElement): Text[] {
 	return results;
 }
 
-function processTextNode(node: Text, def: ProvenanceWord | null): void {
+function processTextNode(
+	node: Text,
+	def: ProvenanceWord | null,
+	hoverScopeId: string,
+): void {
 	const content = node.textContent ?? "";
 	if (!content.includes("%")) return;
 
 	const segments = parse(content);
 	if (!segments.some((s) => s.kind === "span")) return;
 
-	node.replaceWith(buildFragment(segments, def));
+	node.replaceWith(buildFragment(segments, def, hoverScopeId));
 }
 
 function buildFragment(
 	segments: Segment[],
 	def: ProvenanceWord | null,
+	hoverScopeId: string,
 ): DocumentFragment {
 	const frag = document.createDocumentFragment();
 	for (const seg of segments) {
@@ -173,8 +180,9 @@ function buildFragment(
 			const span = document.createElement("span");
 			span.classList.add("mdp-span");
 			span.dataset.provenance = word;
+			applyHoverScope(span, hoverScopeId, true);
 			if (word === def) span.classList.add("mdp-default");
-			span.appendChild(buildFragment(seg.children, def));
+			span.appendChild(buildFragment(seg.children, def, hoverScopeId));
 			frag.appendChild(span);
 		}
 	}
@@ -188,6 +196,7 @@ function buildFragment(
 function processLineBlock(
 	el: HTMLElement,
 	def: ProvenanceWord | null,
+	hoverScopeId: string,
 	sourcePath: string,
 ): void {
 	// Skip if this section is already claimed by an open fenced block — the
@@ -202,7 +211,7 @@ function processLineBlock(
 
 	for (const p of paras) {
 		const sigil = detectLineBlockSigil(p);
-		if (sigil) applyLineBlock(p, sigil, def);
+		if (sigil) applyLineBlock(p, sigil, def, hoverScopeId);
 	}
 }
 
@@ -235,6 +244,7 @@ function applyLineBlock(
 	p: HTMLElement,
 	sigil: BlockSigil,
 	def: ProvenanceWord | null,
+	hoverScopeId: string,
 ): void {
 	stripLineBlockPrefixes(p, sigil);
 
@@ -243,6 +253,7 @@ function applyLineBlock(
 	bq.classList.add("mdp-block");
 	const word = LETTER_TO_WORD[sigil];
 	bq.dataset.provenance = word;
+	applyHoverScope(bq, hoverScopeId, true);
 	if (word === def) bq.classList.add("mdp-default");
 
 	while (p.firstChild) bq.appendChild(p.firstChild);
@@ -320,6 +331,7 @@ function isFenceCandidate(el: HTMLElement): boolean {
 function processFencedBlock(
 	el: HTMLElement,
 	def: ProvenanceWord | null,
+	hoverScopeId: string,
 	sourcePath: string,
 ): void {
 	if (!sourcePath) return;
@@ -342,7 +354,7 @@ function processFencedBlock(
 				const beforeClose = lines.slice(0, closeIndex).join("\n").trim();
 				if (beforeClose) {
 					blockEl.textContent = beforeClose;
-					applyFenceBlock(blockEl, fence.sigil, def);
+					applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId);
 				} else {
 					blockEl.classList.add("mdp-hidden");
 				}
@@ -354,7 +366,7 @@ function processFencedBlock(
 		// Inside an active fence: style immediately. Deferring until the closing
 		// delimiter is brittle because Obsidian may rerender only part of a note.
 		if (fence) {
-			applyFenceBlock(blockEl, fence.sigil, def);
+			applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId);
 			continue;
 		}
 
@@ -374,7 +386,7 @@ function processFencedBlock(
 
 			if (content) {
 				blockEl.textContent = content;
-				applyFenceBlock(blockEl, sigil, def);
+				applyFenceBlock(blockEl, sigil, def, hoverScopeId);
 			} else {
 				blockEl.classList.add("mdp-hidden");
 			}
@@ -424,9 +436,22 @@ function applyFenceBlock(
 	el: HTMLElement,
 	sigil: BlockSigil,
 	def: ProvenanceWord | null,
+	hoverScopeId = "",
 ): void {
 	const word = LETTER_TO_WORD[sigil];
 	el.classList.add("mdp-block");
 	el.dataset.provenance = word;
+	applyHoverScope(el, hoverScopeId, true);
 	if (word === def) el.classList.add("mdp-default");
+}
+
+function applyHoverScope(
+	el: HTMLElement,
+	hoverScopeId: string,
+	isTarget = false,
+): void {
+	if (!hoverScopeId) return;
+	el.dataset.mdpHoverScope = hoverScopeId;
+	el.classList.add("mdp-hover-anchor");
+	if (isTarget) el.classList.add("mdp-hover-target");
 }

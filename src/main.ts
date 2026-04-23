@@ -16,21 +16,23 @@ export default class MDPPlugin extends Plugin {
 	private statusBarEl: HTMLElement | null = null;
 	private statusBarTimer: number | null = null;
 	private statusBarRequest = 0;
-	private tintVisibilityInverted = false;
+	private embVisibilityInverted = false;
 	private ribbonToggleEl: HTMLElement | null = null;
+	private activeHoverScopeId: string | null = null;
+	private activeHoverTargets: HTMLElement[] = [];
 
 	async onload() {
 		await this.loadSettings();
 		this.applyStyles();
-		this.applyTintVisibility();
+		this.applyEmbellishmentVisibility();
 
 		this.statusBarEl = this.addStatusBarItem();
 		this.statusBarEl.addClass("mdp-status-bar");
 
 		this.addCommand({
 			id: "toggle-provenance-tints",
-			name: "Toggle provenance tints",
-			callback: () => this.toggleTintVisibility(),
+			name: "Toggle provenance embellishments",
+			callback: () => this.toggleEmbellishmentVisibility(),
 		});
 		this.syncRibbonToggle();
 
@@ -52,6 +54,7 @@ export default class MDPPlugin extends Plugin {
 				el,
 				docDefault,
 				this.settings.pluginDefault,
+				this.getHoverScopeId(file, ctx.getSectionInfo(el)?.lineStart),
 				ctx.docId || ctx.sourcePath,
 				ctx.getSectionInfo(el),
 			);
@@ -87,6 +90,12 @@ export default class MDPPlugin extends Plugin {
 		}));
 
 		this.addSettingTab(new MDPSettingTab(this.app, this));
+		this.registerDomEvent(document, "mouseover", (event) => {
+			this.updateActiveHoverScope(event.target);
+		});
+		this.registerDomEvent(document, "focusin", (event) => {
+			this.updateActiveHoverScope(event.target);
+		});
 		this.app.workspace.onLayoutReady(() => {
 			this.scheduleStatusBarUpdate(0);
 		});
@@ -97,10 +106,11 @@ export default class MDPPlugin extends Plugin {
 		this.statusBarEl?.remove();
 		document.getElementById(STYLE_EL_ID)?.remove();
 		document.body.classList.remove(
-			"mdp-tints-hover-only",
-			"mdp-tints-force-visible",
-			"mdp-tints-force-hidden",
+			"mdp-embs-hover-only",
+			"mdp-embs-force-visible",
+			"mdp-embs-force-hidden",
 		);
+		this.clearActiveHoverScope();
 		clearFences();
 	}
 
@@ -116,6 +126,9 @@ export default class MDPPlugin extends Plugin {
 		}
 		if (raw.pluginDefault === "self")  raw.pluginDefault = "user";
 		if (raw.pluginDefault === "quote") raw.pluginDefault = "external";
+		if (raw.tintVisibility && !raw.embellishmentVisibility) {
+			raw.embellishmentVisibility = raw.tintVisibility;
+		}
 
 		this.settings = Object.assign(
 			{},
@@ -188,25 +201,32 @@ export default class MDPPlugin extends Plugin {
 		item.show();
 	}
 
-	applyTintVisibility() {
+	applyEmbellishmentVisibility() {
 		document.body.classList.toggle(
-			"mdp-tints-hover-only",
-			this.settings.tintVisibility === "hover",
+			"mdp-embs-hover-only",
+			this.settings.embellishmentVisibility === "hover",
 		);
 		document.body.classList.toggle(
-			"mdp-tints-force-visible",
-			this.settings.tintVisibility === "hover" && this.tintVisibilityInverted,
+			"mdp-embs-force-visible",
+			this.settings.embellishmentVisibility === "hover" && this.embVisibilityInverted,
 		);
 		document.body.classList.toggle(
-			"mdp-tints-force-hidden",
-			this.settings.tintVisibility === "always" && this.tintVisibilityInverted,
+			"mdp-embs-force-hidden",
+			this.settings.embellishmentVisibility === "always" && this.embVisibilityInverted,
 		);
+		if (
+			this.settings.embellishmentVisibility !== "hover" ||
+			this.settings.embellishmentHoverScope !== "section" ||
+			this.embVisibilityInverted
+		) {
+			this.clearActiveHoverScope();
+		}
 		this.updateRibbonToggleLabel();
 	}
 
-	resetTintVisibilityOverride() {
-		this.tintVisibilityInverted = false;
-		this.applyTintVisibility();
+	resetEmbellishmentVisibilityOverride() {
+		this.embVisibilityInverted = false;
+		this.applyEmbellishmentVisibility();
 	}
 
 	syncRibbonToggle() {
@@ -221,34 +241,85 @@ export default class MDPPlugin extends Plugin {
 		}
 		this.ribbonToggleEl = this.addRibbonIcon(
 			"eye",
-			"Toggle provenance tints",
-			() => this.toggleTintVisibility(),
+			"Toggle provenance embellishments",
+			() => this.toggleEmbellishmentVisibility(),
 		);
 		this.ribbonToggleEl.classList.add("mdp-ribbon-toggle");
 		this.updateRibbonToggleLabel();
 	}
 
-	private toggleTintVisibility() {
-		this.tintVisibilityInverted = !this.tintVisibilityInverted;
-		this.applyTintVisibility();
-		new Notice(this.currentTintVisibilityLabel());
+	private toggleEmbellishmentVisibility() {
+		this.embVisibilityInverted = !this.embVisibilityInverted;
+		this.applyEmbellishmentVisibility();
+		new Notice(this.currentEmbellishmentVisibilityLabel());
 	}
 
 	private updateRibbonToggleLabel() {
 		if (!this.ribbonToggleEl) return;
-		this.ribbonToggleEl.setAttribute("aria-label", this.currentTintVisibilityLabel());
-		this.ribbonToggleEl.setAttribute("title", this.currentTintVisibilityLabel());
-		this.ribbonToggleEl.classList.toggle("is-active", this.tintVisibilityInverted);
+		this.ribbonToggleEl.setAttribute("aria-label", this.currentEmbellishmentVisibilityLabel());
+		this.ribbonToggleEl.setAttribute("title", this.currentEmbellishmentVisibilityLabel());
+		this.ribbonToggleEl.classList.toggle("is-active", this.embVisibilityInverted);
 	}
 
-	private currentTintVisibilityLabel(): string {
-		if (this.settings.tintVisibility === "hover") {
-			return this.tintVisibilityInverted
-				? "Provenance tints revealed"
-				: "Provenance tints shown on hover";
+	private currentEmbellishmentVisibilityLabel(): string {
+		if (this.settings.embellishmentVisibility === "hover") {
+			return this.embVisibilityInverted
+				? "Provenance embellishments revealed"
+				: "Provenance embellishments shown on hover";
 		}
-		return this.tintVisibilityInverted
-			? "Provenance tints hidden"
-			: "Provenance tints visible";
+		return this.embVisibilityInverted
+			? "Provenance embellishments hidden"
+			: "Provenance embellishments visible";
+	}
+
+	private updateActiveHoverScope(target: EventTarget | null) {
+		if (
+			this.settings.embellishmentVisibility !== "hover" ||
+			this.settings.embellishmentHoverScope !== "section" ||
+			this.embVisibilityInverted
+		) {
+			this.clearActiveHoverScope();
+			return;
+		}
+
+		const hoverAnchor = target instanceof Element
+			? target.closest<HTMLElement>("[data-mdp-hover-scope]")
+			: null;
+		const hoverScopeId = hoverAnchor?.dataset.mdpHoverScope ?? null;
+
+		if (hoverScopeId === this.activeHoverScopeId) return;
+		this.clearActiveHoverScope();
+		if (!hoverScopeId) return;
+
+		this.activeHoverScopeId = hoverScopeId;
+		for (const element of Array.from(document.querySelectorAll<HTMLElement>(".mdp-hover-target"))) {
+			if (element.dataset.mdpHoverScope !== hoverScopeId) continue;
+			element.classList.add("mdp-hover-active");
+			this.activeHoverTargets.push(element);
+		}
+	}
+
+	private clearActiveHoverScope() {
+		for (const element of this.activeHoverTargets) {
+			element.classList.remove("mdp-hover-active");
+		}
+		this.activeHoverTargets = [];
+		this.activeHoverScopeId = null;
+	}
+
+	private getHoverScopeId(file: TFile | null, lineStart?: number): string {
+		if (!file) return "active-note:root";
+		if (lineStart === undefined || lineStart === null) return `${file.path}:root`;
+
+		const headings = this.app.metadataCache.getFileCache(file)?.headings ?? [];
+		let currentHeadingLine: number | null = null;
+		for (const heading of headings) {
+			if (heading.position.start.line > lineStart) break;
+			currentHeadingLine = heading.position.start.line;
+		}
+
+		return currentHeadingLine === null
+			? `${file.path}:root`
+			: `${file.path}:section:${currentHeadingLine}`;
 	}
 }

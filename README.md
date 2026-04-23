@@ -7,7 +7,7 @@ The draft began as %a{AI-generated boilerplate, which I then shaped into somethi
 I added my own framing, and pulled in %q{this passage from the original paper} for context.
 ```
 
-Marked text gets a subtle background tint in both Live Preview and Reading mode. Everything else is standard Markdown — it degrades gracefully in any editor that doesn't have the plugin.
+Marked text gets a subtle background embellishment in both Live Preview and Reading mode. Everything else is standard Markdown — it degrades gracefully in any editor that doesn't have the plugin.
 
 ---
 
@@ -21,7 +21,7 @@ It's also useful for AI agents writing *into* your notes. The included [agent gu
 
 ## The four sigils
 
-| Sigil | Name | Default tint | Use for |
+| Sigil | Name | Default emb | Use for |
 |-------|------|-------------|---------|
 | `%a`  | assistant | blue | Text written by an AI assistant |
 | `%u`  | user | none (baseline) | Text written by you |
@@ -69,7 +69,7 @@ Valid values: `assistant`, `user`, `external`, `unknown`.
 
 ### Plugin-level default
 
-In Settings → Markdown Provenance, choose a default that applies to notes without a frontmatter key. Set it to `user` for a personal vault where most text is yours — unmarked text renders without any tint, and only AI-generated spans stand out.
+In Settings → Markdown Provenance, choose a default that applies to notes without a frontmatter key. Set it to `user` for a personal vault where most text is yours — unmarked text renders without any embellishment, and only AI-generated spans stand out.
 
 ---
 
@@ -98,15 +98,16 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 
 | Setting | Description |
 |---------|-------------|
-| **Tint colours** | Customize the background color for each provenance type |
-| **Default tint visibility** | Default to hover-only tints, or switch to always-on highlighting |
-| **Show ribbon toggle** | Add a left-ribbon button that temporarily flips tint visibility |
-| **Default provenance type** | Fallback for notes without a frontmatter key; the matching type renders without tint |
+| **Embellishment colours** | Customize the base embellishment color for each provenance type |
+| **Default embellishment visibility** | Show embellishments all the time, or only reveal them on hover |
+| **Hover reveal scope** | In hover mode, reveal just the hovered mark or the whole current section |
+| **Show ribbon toggle** | Add a left-ribbon button that temporarily flips embellishment visibility |
+| **Default provenance type** | Fallback for notes without a frontmatter key; the matching type renders without embellishment |
 | **Auto-add provenance to new notes** | Automatically insert a `provenance:` key into newly created notes |
 | **Show provenance stats** | Display compact current-note provenance statistics in the status bar |
 | **Status bar format** | Show the status summary as percentages or raw character counts |
 
-Use the **Toggle provenance tints** command from the command palette or Obsidian's Hotkeys settings to bind your own shortcut.
+Use the **Toggle provenance embellishments** command from the command palette or Obsidian's Hotkeys settings to bind your own shortcut.
 
 ---
 

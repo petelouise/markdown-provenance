@@ -27,14 +27,14 @@
   background-color: var(--mdp-color-unknown, rgba(255, 193, 7, 0.22));
 }
 
-/* Span whose provenance matches the effective default — suppress the tint */
+/* Span whose provenance matches the effective default — suppress the embellishment */
 .mdp-span.mdp-default {
   background-color: transparent;
 }
 
 /* Visibility modes controlled by settings, command palette, and ribbon toggle */
-body.mdp-tints-hover-only:not(.mdp-tints-force-visible) .mdp-span:not(:hover):not(:focus-within):not(.mdp-active),
-body.mdp-tints-force-hidden .mdp-span {
+body.mdp-embs-hover-only:not(.mdp-embs-force-visible) .mdp-span:not(:hover):not(:focus-within):not(.mdp-active):not(.mdp-hover-active),
+body.mdp-embs-force-hidden .mdp-span {
   background-color: transparent;
 }
 
@@ -50,7 +50,7 @@ body.mdp-tints-force-hidden .mdp-span {
     - block-level elements inside %%%a … %%% fenced regions
 
   For blockquotes, Obsidian's own blockquote styles (indentation, left border)
-  provide the structural framing; we only need to thread the tint through.
+  provide the structural framing; we only need to thread the embellishment through.
   For fenced content (<p>, <ul>, etc.), we add a subtle left border for context.
 */
 
@@ -95,19 +95,19 @@ blockquote.mdp-block[data-provenance="unknown"] {
   padding-left: 0.75em;
 }
 
-/* Block whose provenance matches the effective default — suppress tint and border */
+/* Block whose provenance matches the effective default — suppress embellishment and border */
 .mdp-block.mdp-default {
   background-color: transparent;
   border-left-color: transparent;
 }
 
-body.mdp-tints-hover-only:not(.mdp-tints-force-visible) .mdp-block:not(:hover):not(:focus-within):not(.mdp-active),
-body.mdp-tints-force-hidden .mdp-block {
+body.mdp-embs-hover-only:not(.mdp-embs-force-visible) .mdp-block:not(:hover):not(:focus-within):not(.mdp-active):not(.mdp-hover-active),
+body.mdp-embs-force-hidden .mdp-block {
   background-color: transparent;
 }
 
-body.mdp-tints-hover-only:not(.mdp-tints-force-visible) :not(blockquote).mdp-block:not(:hover):not(:focus-within):not(.mdp-active),
-body.mdp-tints-force-hidden :not(blockquote).mdp-block {
+body.mdp-embs-hover-only:not(.mdp-embs-force-visible) :not(blockquote).mdp-block:not(:hover):not(:focus-within):not(.mdp-active):not(.mdp-hover-active),
+body.mdp-embs-force-hidden :not(blockquote).mdp-block {
   border-left-color: transparent;
 }
 

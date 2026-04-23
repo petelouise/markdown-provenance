@@ -18,7 +18,7 @@ This document describes the MDP syntax for marking text provenance in Markdown n
 
 ## What it is
 
-MDP lets every piece of text in a note carry a label indicating who produced it: an AI assistant, the human author (user), an external source, or unknown. The plugin renders these labels as subtle background tints in Obsidian's editor and reading view. The raw markers are valid Markdown — they degrade gracefully as literal text in any other viewer.
+MDP lets every piece of text in a note carry a label indicating who produced it: an AI assistant, the human author (user), an external source, or unknown. The plugin renders these labels as subtle background embellishments in Obsidian's editor and reading view. The raw markers are valid Markdown — they degrade gracefully as literal text in any other viewer.
 
 ---
 

@@ -49,7 +49,7 @@ export function normalizeProvenance(value: unknown): ProvenanceWord | null {
  * Resolve the effective default provenance for a note.
  *
  * Priority: frontmatter > plugin default > null (no suppression).
- * A plugin default of "none" means "tint everything — no suppression".
+ * A plugin default of "none" means "embellish everything — no suppression".
  */
 export function effectiveDefault(
 	docDefault: ProvenanceWord | null,

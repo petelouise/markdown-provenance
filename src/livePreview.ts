@@ -4,7 +4,7 @@
  * Applies provenance decorations in CodeMirror 6 (Obsidian Live Preview mode)
  * by scanning for MDP span and block syntax. Inline spans use Decoration.mark();
  * block markers use Decoration.line() so whole editor lines can carry
- * provenance tinting. Syntax delimiters are hidden when the cursor is outside
+ * provenance embellishment. Syntax delimiters are hidden when the cursor is outside
  * the marked range.
  */
 
@@ -61,7 +61,12 @@ export function buildLivePreviewExtension(plugin: MDPPluginContext) {
 // Decoration builder
 // ---------------------------------------------------------------------------
 
-type SpanRange = { from: number; to: number; provenance: ProvenanceWord };
+type SpanRange = {
+	from: number;
+	to: number;
+	provenance: ProvenanceWord;
+	hoverScopeId: string;
+};
 type DecoEntry = { from: number; to: number; deco: Decoration };
 
 const HIDE = Decoration.replace({});
@@ -77,26 +82,31 @@ function buildDecorations(view: EditorView, plugin: MDPPluginContext): Decoratio
 
 	const docDefault    = normalizeProvenance(frontmatter?.provenance);
 	const def           = effectiveDefault(docDefault, plugin.settings.pluginDefault);
+	const hoverScopeIds = buildHoverScopeIds(view, activeFile?.path ?? "active-note");
 
 	const spans: SpanRange[] = [];
 	for (const { from, to } of view.visibleRanges) {
-		findSpans(view.state.doc.sliceString(from, to), from, spans);
+		findSpans(view.state.doc.sliceString(from, to), from, spans, hoverScopeIds, view);
 	}
 	spans.sort((a, b) => a.from - b.from || b.to - a.to);
 
 	const cursorHead = view.state.selection.main.head;
 	const entries: DecoEntry[] = [];
 
-	addBlockDecorations(view, def, cursorHead, entries);
+	addHoverAnchors(view, hoverScopeIds, entries);
+	addBlockDecorations(view, def, cursorHead, hoverScopeIds, entries);
 
 	for (const span of spans) {
-		const classes = ["mdp-span"];
+		const classes = ["mdp-span", "mdp-hover-target"];
 		if (span.provenance === def) classes.push("mdp-default");
 		const cursorInSpan = cursorHead >= span.from && cursorHead <= span.to;
 		if (cursorInSpan) classes.push("mdp-active");
 		const mark = Decoration.mark({
 			class: classes.join(" "),
-			attributes: { "data-provenance": span.provenance },
+			attributes: {
+				"data-provenance": span.provenance,
+				"data-mdp-hover-scope": span.hoverScopeId,
+			},
 		});
 
 		if (cursorInSpan) {
@@ -127,6 +137,7 @@ function addBlockDecorations(
 	view: EditorView,
 	def: ProvenanceWord | null,
 	cursorHead: number,
+	hoverScopeIds: string[],
 	entries: DecoEntry[],
 ): void {
 	const doc = view.state.doc;
@@ -154,6 +165,7 @@ function addBlockDecorations(
 						def,
 						"mdp-block-fenced",
 						cursorOnLine(cursorHead, line.from, line.to),
+						hoverScopeIds[line.number] ?? hoverScopeIds[0] ?? "active-note:root",
 					),
 				});
 			}
@@ -184,6 +196,7 @@ function addBlockDecorations(
 				def,
 				"mdp-block-line",
 				cursorOnLine(cursorHead, line.from, line.to),
+				hoverScopeIds[line.number] ?? hoverScopeIds[0] ?? "active-note:root",
 			),
 		});
 		if (!cursorOnLine(cursorHead, line.from, line.to)) {
@@ -197,14 +210,39 @@ function blockLineDecoration(
 	def: ProvenanceWord | null,
 	extraClass: string,
 	active: boolean,
+	hoverScopeId: string,
 ): Decoration {
-	const classes = ["mdp-block", extraClass];
+	const classes = ["mdp-block", "mdp-hover-target", extraClass];
 	if (provenance === def) classes.push("mdp-default");
 	if (active) classes.push("mdp-active");
 	return Decoration.line({
 		class: classes.join(" "),
-		attributes: { "data-provenance": provenance },
+		attributes: {
+			"data-provenance": provenance,
+			"data-mdp-hover-scope": hoverScopeId,
+		},
 	});
+}
+
+function addHoverAnchors(
+	view: EditorView,
+	hoverScopeIds: string[],
+	entries: DecoEntry[],
+): void {
+	for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
+		const line = view.state.doc.line(lineNo);
+		if (!isLineVisible(view, line.from, line.to)) continue;
+		entries.push({
+			from: line.from,
+			to: line.from,
+			deco: Decoration.line({
+				class: "mdp-hover-anchor",
+				attributes: {
+					"data-mdp-hover-scope": hoverScopeIds[line.number] ?? hoverScopeIds[0] ?? "active-note:root",
+				},
+			}),
+		});
+	}
 }
 
 function isLineVisible(view: EditorView, from: number, to: number): boolean {
@@ -219,7 +257,13 @@ function cursorOnLine(cursorHead: number, from: number, to: number): boolean {
 // Position-aware span scanner
 // ---------------------------------------------------------------------------
 
-function findSpans(text: string, offset: number, out: SpanRange[]): void {
+function findSpans(
+	text: string,
+	offset: number,
+	out: SpanRange[],
+	hoverScopeIds: string[],
+	view: EditorView,
+): void {
 	let i = 0;
 	while (i < text.length) {
 		if (text[i] === "\\" && i + 1 < text.length) { i += 2; continue; }
@@ -246,14 +290,42 @@ function findSpans(text: string, offset: number, out: SpanRange[]): void {
 			const spanTo    = j;
 			const provenance = LETTER_TO_WORD[sigil];
 			if (!provenance) { i = spanTo; continue; }
+			const hoverScopeId = hoverScopeIds[view.state.doc.lineAt(offset + spanFrom).number]
+				?? hoverScopeIds[0]
+				?? "active-note:root";
 
-			out.push({ from: offset + spanFrom, to: offset + spanTo, provenance });
-			findSpans(text.slice(spanFrom + 3, spanTo - 1), offset + spanFrom + 3, out);
+			out.push({ from: offset + spanFrom, to: offset + spanTo, provenance, hoverScopeId });
+			findSpans(text.slice(spanFrom + 3, spanTo - 1), offset + spanFrom + 3, out, hoverScopeIds, view);
 			i = spanTo;
 			continue;
 		}
 		i++;
 	}
+}
+
+function buildHoverScopeIds(view: EditorView, sourceKey: string): string[] {
+	const scopeIds = new Array<string>(view.state.doc.lines + 1);
+	let currentScopeId = `${sourceKey}:root`;
+	let inCodeFence = false;
+
+	for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
+		const line = view.state.doc.line(lineNo);
+		const trimmed = line.text.trim();
+
+		if (/^```/.test(trimmed)) {
+			inCodeFence = !inCodeFence;
+			scopeIds[lineNo] = currentScopeId;
+			continue;
+		}
+
+		if (!inCodeFence && /^#{1,6}\s/.test(trimmed)) {
+			currentScopeId = `${sourceKey}:section:${lineNo}`;
+		}
+
+		scopeIds[lineNo] = currentScopeId;
+	}
+
+	return scopeIds;
 }
 
 function skipCodeSpan(text: string, start: number): number {

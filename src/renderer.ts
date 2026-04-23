@@ -36,7 +36,7 @@ type BlockSigil = "a" | "u" | "q" | "?";
 
 // Pre-built per-sigil regexes — avoids per-call RegExp allocation.
 // SIGIL_LINE_RE: anchored (no g flag) — safe for .test() calls.
-// SIGIL_MID_RE:  global — safe for .replace() calls (replace() resets lastIndex).
+// SIGIL_BOUNDARY_RE: global — safe for .replace() calls (replace() resets lastIndex).
 const SIGIL_LINE_RE: Readonly<Record<BlockSigil, RegExp>> = {
 	a:   /^%a> ?/,
 	u:   /^%u> ?/,
@@ -44,11 +44,11 @@ const SIGIL_LINE_RE: Readonly<Record<BlockSigil, RegExp>> = {
 	"?": /^%\?> ?/,
 };
 
-const SIGIL_MID_RE: Readonly<Record<BlockSigil, RegExp>> = {
-	a:   / %a> ?/g,
-	u:   / %u> ?/g,
-	q:   / %q> ?/g,
-	"?": / %\?> ?/g,
+const SIGIL_BOUNDARY_RE: Readonly<Record<BlockSigil, RegExp>> = {
+	a:   /([\n ])%a> ?/g,
+	u:   /([\n ])%u> ?/g,
+	q:   /([\n ])%q> ?/g,
+	"?": /([\n ])%\?> ?/g,
 };
 
 interface FenceState {
@@ -230,7 +230,7 @@ function applyLineBlock(
 
 function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
 	const startRe = SIGIL_LINE_RE[sigil];
-	const midRe   = SIGIL_MID_RE[sigil];
+	const boundaryRe = SIGIL_BOUNDARY_RE[sigil];
 
 	let afterLineStart = true;
 	for (const node of iterateTextAndBreakNodes(el)) {
@@ -240,8 +240,10 @@ function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
 				text = text.replace(startRe, "");
 				afterLineStart = false;
 			}
-			// Space-joined mode: " %X> " in the middle of a single text node
-			text = text.replace(midRe, " ");
+			// Obsidian may keep consecutive source lines as "\n%X>" inside
+			// one text node, or join them as " %X>" in Reading mode.
+			text = text.replace(boundaryRe, "$1");
+			afterLineStart = text.endsWith("\n");
 			node.textContent = text;
 		} else if ((node as Element).tagName === "BR") {
 			afterLineStart = true;

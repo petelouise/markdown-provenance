@@ -111,15 +111,19 @@ export function processElement(
 		activeFences.delete(renderKey);
 	}
 
-	// Inline spans (existing pass — runs first so block stripping sees clean nodes)
+	// Fences may share a rendered paragraph with their content, so strip fence
+	// delimiters before inline processing. Inline spans inside the remaining
+	// fenced content are then parsed normally by the text-node pass below.
+	processFencedBlock(el, def, renderKey);
+
+	// Inline spans
 	const textNodes = collectTextNodes(el);
 	for (const node of textNodes) {
 		processTextNode(node, def);
 	}
 
-	// Block markers. Fenced delimiters must be checked before per-line
-	// markers because `%a>>>` starts with the `%a>` line-marker prefix.
-	processFencedBlock(el, def, renderKey);
+	// Per-line block markers. Fences must be handled first because `%a>>>`
+	// starts with the `%a>` line-marker prefix.
 	processLineBlock(el, def, renderKey);
 }
 
@@ -322,13 +326,29 @@ function processFencedBlock(
 
 	for (const blockEl of collectFenceBlocks(el)) {
 		const fence = activeFences.get(sourcePath);
-		const text = blockEl.textContent?.trim() ?? "";
+		const text = getTextWithBreaks(blockEl).trim();
+		const lines = getFenceLines(blockEl);
 
 		// Closing fence: hide the delimiter and end the active region.
-		if (fence && isFenceCandidate(blockEl) && FENCE_CLOSE_RE.test(text)) {
+		if (fence && isFenceCandidate(blockEl) && isFenceCloseOnly(lines)) {
 			blockEl.classList.add("mdp-hidden");
 			activeFences.delete(sourcePath);
 			continue;
+		}
+
+		if (fence) {
+			const closeIndex = lines.findIndex((line) => FENCE_CLOSE_RE.test(line.trim()));
+			if (closeIndex >= 0) {
+				const beforeClose = lines.slice(0, closeIndex).join("\n").trim();
+				if (beforeClose) {
+					blockEl.textContent = beforeClose;
+					applyFenceBlock(blockEl, fence.sigil, def);
+				} else {
+					blockEl.classList.add("mdp-hidden");
+				}
+				activeFences.delete(sourcePath);
+				continue;
+			}
 		}
 
 		// Inside an active fence: style immediately. Deferring until the closing
@@ -338,7 +358,31 @@ function processFencedBlock(
 			continue;
 		}
 
-		// Opening fence: begin tracking (overwrites any stale prior state for this path)
+		const openIndex = lines.findIndex((line) => FENCE_OPEN_RE.test(line.trim()));
+		if (openIndex >= 0) {
+			const openMatch = lines[openIndex]?.trim().match(FENCE_OPEN_RE);
+			if (!openMatch) continue;
+			const sigil = openMatch[1] as BlockSigil;
+			const closeIndex = lines.findIndex((line, index) =>
+				index > openIndex && FENCE_CLOSE_RE.test(line.trim()),
+			);
+			const contentLines =
+				closeIndex >= 0
+					? lines.slice(openIndex + 1, closeIndex)
+					: lines.slice(openIndex + 1);
+			const content = contentLines.join("\n").trim();
+
+			if (content) {
+				blockEl.textContent = content;
+				applyFenceBlock(blockEl, sigil, def);
+			} else {
+				blockEl.classList.add("mdp-hidden");
+			}
+			if (closeIndex < 0) activeFences.set(sourcePath, { sigil });
+			continue;
+		}
+
+		// Opening fence as the only content: begin tracking.
 		if (isFenceCandidate(blockEl)) {
 			const openMatch = text.match(FENCE_OPEN_RE);
 			if (openMatch) {
@@ -348,6 +392,17 @@ function processFencedBlock(
 			}
 		}
 	}
+}
+
+function getFenceLines(el: HTMLElement): string[] {
+	return getTextWithBreaks(el)
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0);
+}
+
+function isFenceCloseOnly(lines: string[]): boolean {
+	return lines.length === 1 && FENCE_CLOSE_RE.test(lines[0] ?? "");
 }
 
 function collectFenceBlocks(el: HTMLElement): HTMLElement[] {

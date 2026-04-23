@@ -14,11 +14,11 @@ Separate tint opacities for Obsidian's light and dark themes via
 Reading mode (post-processor) implemented: `%a>` per-line blocks and `%a>>>`/`%>>>` fenced blocks.
 See `mdp-spec.md` §5 for the full spec.
 
-### Block markers — live preview (CM6)
-Live preview support for block markers is deferred. Inline spans already work
-in the editor; block markers show as raw text in editing mode and render correctly
-when switching to Reading view. CM6 block-level decorations require a different
-API (`Decoration.line()`) than the inline `Decoration.mark()` currently in use.
+### Block markers — live preview (CM6) ✅
+Live preview support for block markers is implemented with CM6 line decorations.
+Inline spans continue to use `Decoration.mark()`, while `%X>` per-line markers
+and `%X>>>`/`%>>>` fenced blocks use `Decoration.line()` plus hidden syntax
+decorations when the cursor is outside the marker line.
 
 ### Provenance summary / statistics
 Status bar item or side panel showing a breakdown of the current note:

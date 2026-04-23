@@ -2,9 +2,10 @@
  * MDP Live Preview extension.
  *
  * Applies provenance decorations in CodeMirror 6 (Obsidian Live Preview mode)
- * by scanning visible ranges for MDP span syntax and adding Decoration.mark()
- * for each matched range. Syntax delimiters are hidden when the cursor is
- * outside a span.
+ * by scanning for MDP span and block syntax. Inline spans use Decoration.mark();
+ * block markers use Decoration.line() so whole editor lines can carry
+ * provenance tinting. Syntax delimiters are hidden when the cursor is outside
+ * the marked range.
  */
 
 import {
@@ -14,7 +15,6 @@ import {
 	ViewPlugin,
 	ViewUpdate,
 } from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
 import { App } from "obsidian";
 import {
 	ProvenanceWord,
@@ -65,6 +65,9 @@ type SpanRange = { from: number; to: number; provenance: ProvenanceWord };
 type DecoEntry = { from: number; to: number; deco: Decoration };
 
 const HIDE = Decoration.replace({});
+const BLOCK_LINE_RE = /^%(a|u|q|\?)>(?!>) ?/;
+const FENCE_OPEN_RE = /^%([auq?])>>>$/;
+const FENCE_CLOSE_RE = /^%>>>$/;
 
 function buildDecorations(view: EditorView, plugin: MDPPluginContext): DecorationSet {
 	const activeFile = plugin.app.workspace.getActiveFile();
@@ -83,6 +86,8 @@ function buildDecorations(view: EditorView, plugin: MDPPluginContext): Decoratio
 
 	const cursorHead = view.state.selection.main.head;
 	const entries: DecoEntry[] = [];
+
+	addBlockDecorations(view, def, cursorHead, entries);
 
 	for (const span of spans) {
 		const classes = ["mdp-span"];
@@ -108,12 +113,94 @@ function buildDecorations(view: EditorView, plugin: MDPPluginContext): Decoratio
 	}
 
 	entries.sort((a, b) => a.from - b.from || b.to - a.to);
+	return Decoration.set(
+		entries.map(({ from, to, deco }) => deco.range(from, to)),
+		true,
+	);
+}
 
-	const builder = new RangeSetBuilder<Decoration>();
-	for (const { from, to, deco } of entries) {
-		builder.add(from, to, deco);
+// ---------------------------------------------------------------------------
+// Position-aware block marker scanner
+// ---------------------------------------------------------------------------
+
+function addBlockDecorations(
+	view: EditorView,
+	def: ProvenanceWord | null,
+	cursorHead: number,
+	entries: DecoEntry[],
+): void {
+	const doc = view.state.doc;
+	let activeFence: ProvenanceWord | null = null;
+
+	for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
+		const line = doc.line(lineNo);
+		const trimmed = line.text.trim();
+
+		if (activeFence) {
+			if (FENCE_CLOSE_RE.test(trimmed)) {
+				if (isLineVisible(view, line.from, line.to) && !cursorOnLine(cursorHead, line.from, line.to)) {
+					entries.push({ from: line.from, to: line.to, deco: HIDE });
+				}
+				activeFence = null;
+				continue;
+			}
+
+			if (isLineVisible(view, line.from, line.to)) {
+				entries.push({
+					from: line.from,
+					to: line.from,
+					deco: blockLineDecoration(activeFence, def, "mdp-block-fenced"),
+				});
+			}
+			continue;
+		}
+
+		const openMatch = trimmed.match(FENCE_OPEN_RE);
+		if (openMatch) {
+			const provenance = LETTER_TO_WORD[openMatch[1] as ProvenanceLetter];
+			if (isLineVisible(view, line.from, line.to) && !cursorOnLine(cursorHead, line.from, line.to)) {
+				entries.push({ from: line.from, to: line.to, deco: HIDE });
+			}
+			activeFence = provenance;
+			continue;
+		}
+
+		const lineMatch = line.text.match(BLOCK_LINE_RE);
+		if (!lineMatch) continue;
+
+		const provenance = LETTER_TO_WORD[lineMatch[1] as ProvenanceLetter];
+		if (!isLineVisible(view, line.from, line.to)) continue;
+
+		entries.push({
+			from: line.from,
+			to: line.from,
+			deco: blockLineDecoration(provenance, def, "mdp-block-line"),
+		});
+		if (!cursorOnLine(cursorHead, line.from, line.to)) {
+			entries.push({ from: line.from, to: line.from + lineMatch[0].length, deco: HIDE });
+		}
 	}
-	return builder.finish();
+}
+
+function blockLineDecoration(
+	provenance: ProvenanceWord,
+	def: ProvenanceWord | null,
+	extraClass: string,
+): Decoration {
+	const classes = ["mdp-block", extraClass];
+	if (provenance === def) classes.push("mdp-default");
+	return Decoration.line({
+		class: classes.join(" "),
+		attributes: { "data-provenance": provenance },
+	});
+}
+
+function isLineVisible(view: EditorView, from: number, to: number): boolean {
+	return view.visibleRanges.some((range) => from <= range.to && to >= range.from);
+}
+
+function cursorOnLine(cursorHead: number, from: number, to: number): boolean {
+	return cursorHead >= from && cursorHead <= to;
 }
 
 // ---------------------------------------------------------------------------

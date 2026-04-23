@@ -1,12 +1,13 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { ProvenanceWord } from "./provenance";
-import { MDPSettings } from "./settings";
+import { MDPSettings, StatusBarMode } from "./settings";
 
 interface MDPPluginHost {
 	app: App;
 	settings: MDPSettings;
 	saveSettings(): Promise<void>;
 	applyStyles(): void;
+	updateStatusBar(): Promise<void>;
 }
 
 export class MDPSettingTab extends PluginSettingTab {
@@ -99,6 +100,41 @@ export class MDPSettingTab extends PluginSettingTab {
 
 		// Reflect initial disabled state
 		autoInsertSetting.setDisabled(this.plugin.settings.pluginDefault === "none");
+
+		// ── Status bar ───────────────────────────────────────────────────────
+		containerEl.createEl("h3", { text: "Status bar" });
+		containerEl.createEl("p", {
+			text: "Show compact provenance statistics for the active Markdown file.",
+			cls: "setting-item-description",
+		});
+
+		new Setting(containerEl)
+			.setName("Show provenance stats")
+			.setDesc("Display a compact provenance summary in the status bar.")
+			.addToggle(toggle => {
+				toggle
+					.setValue(this.plugin.settings.statusBarStatsEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.statusBarStatsEnabled = value;
+						await this.plugin.saveSettings();
+						void this.plugin.updateStatusBar();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Status bar format")
+			.setDesc("Choose whether the summary shows percentages or raw counts.")
+			.addDropdown(drop => {
+				drop
+					.addOption("percent", "Percentages")
+					.addOption("count", "Counts")
+					.setValue(this.plugin.settings.statusBarStatsMode)
+					.onChange(async (value) => {
+						this.plugin.settings.statusBarStatsMode = value as StatusBarMode;
+						await this.plugin.saveSettings();
+						void this.plugin.updateStatusBar();
+					});
+			});
 	}
 
 	private addColorSetting(

@@ -1,5 +1,7 @@
 import { ProvenanceWord } from "./provenance";
 
+export type StatusBarMode = "percent" | "count";
+
 export interface MDPSettings {
 	colors: {
 		assistant: string;
@@ -22,6 +24,8 @@ export interface MDPSettings {
 	separateDarkMode: boolean;
 	pluginDefault: ProvenanceWord | "none";
 	autoInsertFrontmatter: boolean;
+	statusBarStatsEnabled: boolean;
+	statusBarStatsMode: StatusBarMode;
 }
 
 export const DEFAULT_SETTINGS: MDPSettings = {
@@ -35,6 +39,8 @@ export const DEFAULT_SETTINGS: MDPSettings = {
 	separateDarkMode: false,
 	pluginDefault: "user",
 	autoInsertFrontmatter: false,
+	statusBarStatsEnabled: false,
+	statusBarStatsMode: "percent",
 };
 
 /**

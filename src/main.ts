@@ -1,4 +1,4 @@
-import { Plugin, TFile } from "obsidian";
+import { MarkdownView, Plugin, TFile } from "obsidian";
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 import { normalizeProvenance } from "./provenance";
@@ -6,16 +6,22 @@ import { processElement, clearFences } from "./renderer";
 import { buildLivePreviewExtension } from "./livePreview";
 import { buildAutoRemarkExtension } from "./autoRemark";
 import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCSS } from "./settings";
+import { computeProvenanceStats, formatProvenanceStats } from "./stats";
 import { MDPSettingTab } from "./settingsTab";
 
 const STYLE_EL_ID = "mdp-dynamic-styles";
 
 export default class MDPPlugin extends Plugin {
 	settings: MDPSettings;
+	private statusBarEl: HTMLElement | null = null;
+	private statusBarTimer: number | null = null;
+	private statusBarRequest = 0;
 
 	async onload() {
 		await this.loadSettings();
 		this.applyStyles();
+		this.statusBarEl = this.addStatusBarItem();
+		this.statusBarEl.addClass("mdp-status-bar");
 
 		// Live Preview (CodeMirror 6) — pass plugin as context
 		this.registerEditorExtension(buildLivePreviewExtension(this));
@@ -57,10 +63,27 @@ export default class MDPPlugin extends Plugin {
 			})
 		);
 
+		this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
+			this.scheduleStatusBarUpdate();
+		}));
+		this.registerEvent(this.app.workspace.on("editor-change", () => {
+			this.scheduleStatusBarUpdate();
+		}));
+		this.registerEvent(this.app.vault.on("modify", (file) => {
+			if (file instanceof TFile && file.extension === "md") {
+				this.scheduleStatusBarUpdate();
+			}
+		}));
+
 		this.addSettingTab(new MDPSettingTab(this.app, this));
+		this.app.workspace.onLayoutReady(() => {
+			this.scheduleStatusBarUpdate(0);
+		});
 	}
 
 	onunload() {
+		if (this.statusBarTimer !== null) window.clearTimeout(this.statusBarTimer);
+		this.statusBarEl?.remove();
 		document.getElementById(STYLE_EL_ID)?.remove();
 		clearFences();
 	}
@@ -103,5 +126,49 @@ export default class MDPPlugin extends Plugin {
 			document.head.appendChild(styleEl);
 		}
 		styleEl.textContent = buildDynamicCSS(this.settings);
+	}
+
+	scheduleStatusBarUpdate(delay = 75): void {
+		if (!this.statusBarEl) return;
+		if (this.statusBarTimer !== null) window.clearTimeout(this.statusBarTimer);
+		this.statusBarTimer = window.setTimeout(() => {
+			this.statusBarTimer = null;
+			void this.updateStatusBar();
+		}, delay);
+	}
+
+	async updateStatusBar(): Promise<void> {
+		const item = this.statusBarEl;
+		if (!item) return;
+
+		const requestId = ++this.statusBarRequest;
+		if (!this.settings.statusBarStatsEnabled) {
+			item.hide();
+			item.setText("");
+			return;
+		}
+
+		const file = this.app.workspace.getActiveFile();
+		if (!(file instanceof TFile) || file.extension !== "md") {
+			item.hide();
+			item.setText("");
+			return;
+		}
+
+		let rawText = "";
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView?.file?.path === file.path && activeView.editor) {
+			rawText = activeView.editor.getValue();
+		} else {
+			rawText = await this.app.vault.read(file);
+		}
+
+		if (requestId !== this.statusBarRequest) return;
+
+		const stats = computeProvenanceStats(rawText, this.settings.pluginDefault);
+		const label = formatProvenanceStats(stats, this.settings.statusBarStatsMode);
+		item.setText(label);
+		item.setAttr("title", `${file.path} • ${label}`);
+		item.show();
 	}
 }

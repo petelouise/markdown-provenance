@@ -6,7 +6,7 @@
  *
  * Also handles block-level markers:
  *   - Per-line: %a> text (each line carries the prefix; rendered as <blockquote>)
- *   - Fenced:   %%%a … %%% (tint only, no blockquote indent)
+ *   - Fenced:   %a>>> … %>>> (tint only, no blockquote indent)
  */
 
 import { parse, Segment } from "./parser";
@@ -29,8 +29,8 @@ export { normalizeProvenance };
 // Space after > is optional, matching CommonMark's blockquote rule (both
 // `> text` and `>text` are valid). The regex mirrors that behaviour.
 const BLOCK_LINE_RE = /^%(a|u|q|\?)> ?/;
-const FENCE_OPEN_RE = /^%%%([auq?])$/;
-const FENCE_CLOSE_RE = /^%%%$/;
+const FENCE_OPEN_RE = /^%([auq?])>>>$/;
+const FENCE_CLOSE_RE = /^%>>>$/;
 
 type BlockSigil = "a" | "u" | "q" | "?";
 
@@ -281,7 +281,7 @@ function iterateTextAndBreakNodes(el: HTMLElement): ChildNode[] {
 }
 
 // ---------------------------------------------------------------------------
-// Fenced block markers: %%%a … %%%
+// Fenced block markers: %a>>> … %>>>
 // ---------------------------------------------------------------------------
 
 /**

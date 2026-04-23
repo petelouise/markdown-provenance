@@ -11,7 +11,7 @@ Separate tint opacities for Obsidian's light and dark themes via
 `body.theme-light` / `body.theme-dark` CSS scoping.
 
 ### Block markers ✅
-Reading mode (post-processor) implemented: `%a>` per-line blocks and `%%%a`/`%%%` fenced blocks.
+Reading mode (post-processor) implemented: `%a>` per-line blocks and `%a>>>`/`%>>>` fenced blocks.
 See `mdp-spec.md` §5 for the full spec.
 
 ### Block markers — live preview (CM6)

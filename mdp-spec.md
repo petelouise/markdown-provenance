@@ -129,21 +129,21 @@ The block continues as long as consecutive lines carry the same `%X>` prefix. A 
 
 The renderer converts these lines into a `<blockquote>` element with the appropriate provenance tint, so the block gets both Obsidian's standard blockquote visual treatment (indentation, left border) and the provenance colour.
 
-### 5.2 Multi-Block Fencing (`%%%a … %%%`)
+### 5.2 Multi-Block Fencing (`%a>>> … %>>>`)
 
-For multiple consecutive blocks under the same provenance, use a fenced form with triple-percent delimiters:
+For multiple consecutive blocks under the same provenance, use a fenced form with a sigil-bearing opening delimiter and a neutral closing delimiter:
 
 ```markdown
-%%%a
+%a>>>
 This is paragraph one from the assistant.
 
 This is paragraph two from the assistant.
 
 - This list is also from the assistant
-%%%
+%>>>
 ```
 
-The opening fence is `%%%` followed by a provenance sigil letter. The closing fence is `%%%` alone on a line. This mirrors the fenced code block pattern (```` ``` ````), keeping the syntax memorable.
+The opening fence is a provenance sigil followed by `>>>`. The closing fence is `%>>>` alone on a line. This avoids Obsidian's `%% ... %%` comment syntax while still resembling a Markdown fence.
 
 Fenced content receives a tint and a left border but is **not** rendered as a `<blockquote>` — the blockquote indentation would be visually heavy for large regions.
 
@@ -257,7 +257,7 @@ Obsidian uses a CodeMirror 6 editor with a custom Markdown parser pipeline. The 
 For standalone or general-purpose Markdown parsers (e.g. markdown-it, remark, unified):
 
 - MDP inline spans should be parsed at the same priority level as links and images — after code spans, before emphasis.
-- Block markers (`%a>`, `%%%a`) should be parsed at the block level, before paragraph assembly.
+- Block markers (`%a>`, `%a>>>`) should be parsed at the block level, before paragraph assembly.
 - The parser should expose provenance as AST metadata, not as a separate tree, so downstream transforms (e.g. HTML rendering) can access it naturally.
 
 ---
@@ -280,7 +280,7 @@ inline-span        = provenance-sigil "{" content "}"
 content            = *(inline-span / escaped-char / text)
 escaped-char       = "\" ("%" / "{" / "}")
 block-line         = 1*(provenance-sigil ">" [SP] text newline)
-block-fenced       = "%%%" provenance-letter newline blocks "%%%" newline
+block-fenced       = provenance-sigil ">>>" newline blocks "%>>>" newline
 ```
 
 ## Appendix B: Examples
@@ -314,10 +314,10 @@ The `/users` endpoint accepts GET and POST requests.
 
 %u{Note: rate limiting was increased to 1000 req/min as of March 2025.}
 
-%%%u
+%u>>>
 ## Changelog
 
 This section is maintained manually by the engineering team.
 All entries below are written by users.
-%%%
+%>>>
 ```

@@ -5,7 +5,7 @@ description: >
   (Markdown Provenance) is in use. This covers any task that creates, edits,
   or adds content to .md files — even small edits, since a single inserted
   sentence still needs %a{} wrapping. Applies to both inline span syntax
-  (%a{...}, %u{...}, %q{...}, %?{...}) and block syntax (%a>, %%%a).
+  (%a{...}, %u{...}, %q{...}, %?{...}) and block syntax (%a>, %a>>>).
   Use this skill any time the vault contains MDP markers or the user mentions
   provenance, attribution, or who wrote what.
 ---
@@ -73,14 +73,14 @@ When an entire paragraph has a single provenance, prefix every line with `%X>` (
 For multi-paragraph regions under the same provenance, use a fenced form:
 
 ```markdown
-%%%a
+%a>>>
 This is AI paragraph one.
 
 This is AI paragraph two. Still inside the fence.
-%%%
+%>>>
 ```
 
-The closing `%%%` (alone on a line) ends the fence regardless of the opening sigil. Inline spans inside a block or fence still work and override the block provenance for their span:
+The closing `%>>>` (alone on a line) ends the fence regardless of the opening sigil. Inline spans inside a block or fence still work and override the block provenance for their span:
 
 ```markdown
 %a> The assistant wrote this. %u{I inserted this correction.} The assistant continued.
@@ -89,7 +89,7 @@ The closing `%%%` (alone on a line) ends the fence regardless of the opening sig
 **When to use blocks vs. inline spans:**
 - Use inline `%a{...}` for short runs of text within a paragraph the human is primarily authoring.
 - Use `%a>` for paragraphs you (the assistant) wrote entirely.
-- Use `%%%a … %%%` for sections of several paragraphs you wrote entirely.
+- Use `%a>>> … %>>>` for sections of several paragraphs you wrote entirely.
 
 ### Escaping
 
@@ -118,7 +118,7 @@ Accepted aliases: `ai` → `assistant`, `human` → `user`, `self` → `user`, `
 
 When you write or edit a Markdown note:
 
-1. **Mark everything you write.** Use inline `%a{...}` for short runs of text, `%a>` for whole paragraphs you authored, and `%%%a … %%%` for multi-paragraph sections you authored — unless the note's frontmatter sets `provenance: assistant`, in which case you may leave your text unmarked.
+1. **Mark everything you write.** Use inline `%a{...}` for short runs of text, `%a>` for whole paragraphs you authored, and `%a>>> … %>>>` for multi-paragraph sections you authored — unless the note's frontmatter sets `provenance: assistant`, in which case you may leave your text unmarked.
 
 2. **Do not re-mark text that was already there.** If user-authored text (`%u{...}` or unmarked in a `provenance: user` note) exists, leave it as-is unless you are explicitly rewriting it.
 
@@ -130,7 +130,7 @@ When you write or edit a Markdown note:
 
 6. **If in doubt about a passage's origin,** use `%?{...}`.
 
-7. **Choose the right granularity.** A full paragraph you wrote → `%a>`. A sentence you inserted in someone else's paragraph → `%a{...}`. A multi-paragraph section → `%%%a … %%%`.
+7. **Choose the right granularity.** A full paragraph you wrote → `%a>`. A sentence you inserted in someone else's paragraph → `%a{...}`. A multi-paragraph section → `%a>>> … %>>>`.
 
 ---
 

@@ -21,9 +21,16 @@ and `%X>>>`/`%>>>` fenced blocks use `Decoration.line()` plus hidden syntax
 decorations when the cursor is outside the marker line.
 
 ### Provenance summary / statistics
-Status bar item or side panel showing a breakdown of the current note:
-"41% assistant · 52% self · 7% quote". Makes the plugin's purpose immediately
-legible and useful for research/writing workflows.
+Use the status bar as the primary surface for the current note, since it keeps
+the signal visible while writing without pulling attention away from the text.
+A compact summary like `41% assistant · 52% self · 7% quote` makes the plugin's
+purpose legible at a glance, with a toggle to switch between percentages and
+counts depending on whether the user wants composition or raw volume. Scope
+should be explicit: default to the current note, with a vault-level view as an
+optional expansion for broader research workflows. Settings should configure the
+feature and preview its display, not become the main statistics home; the live
+status bar summary is the product, while settings are for choosing how that
+summary behaves.
 
 ### Hover-only mode + hotkey toggle
 Option to hide all tints by default and only show them on hover over a span,

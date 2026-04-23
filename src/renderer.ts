@@ -9,9 +9,9 @@
  *   - Fenced:   %a>>> … %>>> (embellishment only, no blockquote indent)
  */
 
-import { parse, Segment } from "./parser";
 import {
 	ProvenanceWord,
+	ProvenanceLetter,
 	LETTER_TO_WORD,
 	normalizeProvenance,
 	effectiveDefault,
@@ -119,10 +119,7 @@ export function processElement(
 	processFencedBlock(el, def, hoverScopeId, renderKey);
 
 	// Inline spans
-	const textNodes = collectTextNodes(el);
-	for (const node of textNodes) {
-		processTextNode(node, def, hoverScopeId);
-	}
+	processInlineMarkup(el, def, hoverScopeId);
 
 	// Per-line block markers. Fences must be handled first because `%a>>>`
 	// starts with the `%a>` line-marker prefix.
@@ -130,63 +127,164 @@ export function processElement(
 }
 
 // ---------------------------------------------------------------------------
-// Inline helpers (unchanged from original)
+// Inline helpers
 // ---------------------------------------------------------------------------
 
-function collectTextNodes(root: HTMLElement): Text[] {
-	const results: Text[] = [];
-	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-		acceptNode(node) {
-			let parent = node.parentElement;
-			while (parent) {
-				const tag = parent.tagName.toLowerCase();
-				if (tag === "code" || tag === "pre") return NodeFilter.FILTER_REJECT;
-				if (parent === root) break;
-				parent = parent.parentElement;
-			}
-			return NodeFilter.FILTER_ACCEPT;
-		},
-	});
-	let node: Node | null;
-	while ((node = walker.nextNode())) results.push(node as Text);
-	return results;
-}
+const INLINE_SIGILS = new Set<ProvenanceLetter>(["a", "u", "q", "?", "s"]);
 
-function processTextNode(
-	node: Text,
+function processInlineMarkup(
+	root: HTMLElement,
 	def: ProvenanceWord | null,
 	hoverScopeId: string,
 ): void {
-	const content = node.textContent ?? "";
-	if (!content.includes("%")) return;
+	if (!root.textContent?.includes("%")) return;
 
-	const segments = parse(content);
-	if (!segments.some((s) => s.kind === "span")) return;
+	const frag = document.createDocumentFragment();
+	const spanStack: HTMLSpanElement[] = [];
+	const didRewrite = rewriteInlineNodes(
+		Array.from(root.childNodes),
+		frag,
+		spanStack,
+		def,
+		hoverScopeId,
+	);
 
-	node.replaceWith(buildFragment(segments, def, hoverScopeId));
+	// Leave malformed spans untouched rather than stripping their delimiters.
+	if (!didRewrite || spanStack.length > 0) return;
+	root.replaceChildren(frag);
 }
 
-function buildFragment(
-	segments: Segment[],
+function rewriteInlineNodes(
+	nodes: ChildNode[],
+	parent: Node,
+	spanStack: HTMLSpanElement[],
 	def: ProvenanceWord | null,
 	hoverScopeId: string,
-): DocumentFragment {
-	const frag = document.createDocumentFragment();
-	for (const seg of segments) {
-		if (seg.kind === "text") {
-			frag.appendChild(document.createTextNode(seg.content));
-		} else {
-			const word = LETTER_TO_WORD[seg.provenance];
-			const span = document.createElement("span");
-			span.classList.add("mdp-span");
-			span.dataset.provenance = word;
-			applyHoverScope(span, hoverScopeId, true);
-			if (word === def) span.classList.add("mdp-default");
-			span.appendChild(buildFragment(seg.children, def, hoverScopeId));
-			frag.appendChild(span);
+): boolean {
+	let didRewrite = false;
+
+	for (const node of nodes) {
+		if (node.nodeType === Node.TEXT_NODE) {
+			didRewrite = rewriteInlineText(
+				node.textContent ?? "",
+				parent,
+				spanStack,
+				def,
+				hoverScopeId,
+			) || didRewrite;
+			continue;
 		}
+
+		if (!(node instanceof HTMLElement)) {
+			appendInlineNode(parent, spanStack, node.cloneNode(true));
+			continue;
+		}
+
+		const tag = node.tagName.toLowerCase();
+		if (tag === "code" || tag === "pre") {
+			appendInlineNode(parent, spanStack, node.cloneNode(true));
+			continue;
+		}
+
+		const clone = node.cloneNode(false);
+		appendInlineNode(parent, spanStack, clone);
+		didRewrite = rewriteInlineNodes(
+			Array.from(node.childNodes),
+			clone,
+			spanStack,
+			def,
+			hoverScopeId,
+		) || didRewrite;
 	}
-	return frag;
+
+	return didRewrite;
+}
+
+function rewriteInlineText(
+	text: string,
+	parent: Node,
+	spanStack: HTMLSpanElement[],
+	def: ProvenanceWord | null,
+	hoverScopeId: string,
+): boolean {
+	let didRewrite = false;
+	let buffer = "";
+
+	const flushBuffer = () => {
+		if (!buffer) return;
+		appendInlineText(parent, spanStack, buffer);
+		buffer = "";
+	};
+
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i] ?? "";
+		const next = text[i + 1] ?? "";
+		const afterNext = text[i + 2] ?? "";
+
+		if (ch === "\\" && (next === "%" || next === "}")) {
+			buffer += next;
+			i++;
+			continue;
+		}
+
+		if (ch === "%" && INLINE_SIGILS.has(next as ProvenanceLetter) && afterNext === "{") {
+			flushBuffer();
+			openInlineSpan(parent, spanStack, next as ProvenanceLetter, def, hoverScopeId);
+			didRewrite = true;
+			i += 2;
+			continue;
+		}
+
+		if (ch === "}" && spanStack.length > 0) {
+			flushBuffer();
+			spanStack.pop();
+			didRewrite = true;
+			continue;
+		}
+
+		buffer += ch;
+	}
+
+	flushBuffer();
+	return didRewrite;
+}
+
+function appendInlineText(
+	parent: Node,
+	spanStack: HTMLSpanElement[],
+	text: string,
+): void {
+	appendInlineNode(parent, spanStack, getNodeDocument(parent).createTextNode(text));
+}
+
+function appendInlineNode(
+	parent: Node,
+	spanStack: HTMLSpanElement[],
+	node: Node,
+): void {
+	const target = spanStack[spanStack.length - 1] ?? parent;
+	target.appendChild(node);
+}
+
+function openInlineSpan(
+	parent: Node,
+	spanStack: HTMLSpanElement[],
+	sigil: ProvenanceLetter,
+	def: ProvenanceWord | null,
+	hoverScopeId: string,
+): void {
+	const span = getNodeDocument(parent).createElement("span");
+	const word = LETTER_TO_WORD[sigil];
+	span.classList.add("mdp-span");
+	span.dataset.provenance = word;
+	applyHoverScope(span, hoverScopeId, true);
+	if (word === def) span.classList.add("mdp-default");
+	appendInlineNode(parent, spanStack, span);
+	spanStack.push(span);
+}
+
+function getNodeDocument(node: Node): Document {
+	return node.ownerDocument ?? document;
 }
 
 // ---------------------------------------------------------------------------

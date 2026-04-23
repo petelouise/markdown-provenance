@@ -22,6 +22,8 @@ export interface MDPSettings {
 	separateDarkMode: boolean;
 	pluginDefault: ProvenanceWord | "none";
 	autoInsertFrontmatter: boolean;
+	tintVisibility: "always" | "hover";
+	showRibbonToggle: boolean;
 }
 
 export const DEFAULT_SETTINGS: MDPSettings = {
@@ -35,6 +37,8 @@ export const DEFAULT_SETTINGS: MDPSettings = {
 	separateDarkMode: false,
 	pluginDefault: "user",
 	autoInsertFrontmatter: false,
+	tintVisibility: "always",
+	showRibbonToggle: true,
 };
 
 /**

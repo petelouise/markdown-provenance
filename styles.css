@@ -32,6 +32,12 @@
   background-color: transparent;
 }
 
+/* Visibility modes controlled by settings, command palette, and ribbon toggle */
+body.mdp-tints-hover-only:not(.mdp-tints-force-visible) .mdp-span:not(:hover):not(:focus-within):not(.mdp-active),
+body.mdp-tints-force-hidden .mdp-span {
+  background-color: transparent;
+}
+
 .mdp-hidden {
   display: none !important;
 }
@@ -93,4 +99,18 @@ blockquote.mdp-block[data-provenance="unknown"] {
 .mdp-block.mdp-default {
   background-color: transparent;
   border-left-color: transparent;
+}
+
+body.mdp-tints-hover-only:not(.mdp-tints-force-visible) .mdp-block:not(:hover):not(:focus-within):not(.mdp-active),
+body.mdp-tints-force-hidden .mdp-block {
+  background-color: transparent;
+}
+
+body.mdp-tints-hover-only:not(.mdp-tints-force-visible) :not(blockquote).mdp-block:not(:hover):not(:focus-within):not(.mdp-active),
+body.mdp-tints-force-hidden :not(blockquote).mdp-block {
+  border-left-color: transparent;
+}
+
+.mdp-ribbon-toggle.is-active {
+  color: var(--interactive-accent);
 }

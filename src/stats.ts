@@ -26,6 +26,10 @@ const PROVENANCE_SHORT: Record<ProvenanceWord, string> = {
 	unknown: "?",
 };
 
+const BLOCK_LINE_RE = /^%(a|u|q|\?)>(?!>) ?/;
+const FENCE_OPEN_RE = /^%([auq?])>>>$/;
+const FENCE_CLOSE_RE = /^%>>>$/;
+
 export function computeProvenanceStats(
 	rawText: string,
 	pluginDefault: ProvenanceWord | "none",
@@ -35,8 +39,10 @@ export function computeProvenanceStats(
 	const defaultProvenance = effectiveDefault(frontmatterDefault, pluginDefault);
 
 	const counts = zeroCounts();
-	for (const segment of parse(body)) {
-		accumulateSegment(segment, defaultProvenance, counts);
+	for (const block of collectProvenanceBlocks(body, defaultProvenance)) {
+		for (const segment of parse(block.text)) {
+			accumulateSegment(segment, block.provenance, counts);
+		}
 	}
 
 	const total = PROVENANCE_ORDER.reduce((sum, key) => sum + counts[key], 0);
@@ -75,6 +81,59 @@ function zeroCounts(): Record<ProvenanceWord, number> {
 		external: 0,
 		unknown: 0,
 	};
+}
+
+function collectProvenanceBlocks(
+	text: string,
+	defaultProvenance: ProvenanceWord | null,
+): { text: string; provenance: ProvenanceWord | null }[] {
+	const blocks: { text: string; provenance: ProvenanceWord | null }[] = [];
+	const lines = text.split("\n");
+	let activeFence: ProvenanceWord | null = null;
+	let bufferedDefault: string[] = [];
+
+	const flushDefault = () => {
+		if (bufferedDefault.length === 0) return;
+		blocks.push({
+			text: bufferedDefault.join("\n"),
+			provenance: defaultProvenance,
+		});
+		bufferedDefault = [];
+	};
+
+	for (const line of lines) {
+		if (activeFence) {
+			if (FENCE_CLOSE_RE.test(line.trim())) {
+				activeFence = null;
+				continue;
+			}
+			blocks.push({ text: line, provenance: activeFence });
+			continue;
+		}
+
+		const fenceMatch = line.trim().match(FENCE_OPEN_RE);
+		if (fenceMatch) {
+			flushDefault();
+			activeFence = LETTER_TO_WORD[fenceMatch[1] as keyof typeof LETTER_TO_WORD];
+			continue;
+		}
+
+		const blockLineMatch = line.match(BLOCK_LINE_RE);
+		if (blockLineMatch) {
+			flushDefault();
+			const provenance = LETTER_TO_WORD[blockLineMatch[1] as keyof typeof LETTER_TO_WORD];
+			blocks.push({
+				text: line.slice(blockLineMatch[0].length),
+				provenance,
+			});
+			continue;
+		}
+
+		bufferedDefault.push(line);
+	}
+
+	flushDefault();
+	return blocks;
 }
 
 function accumulateSegment(

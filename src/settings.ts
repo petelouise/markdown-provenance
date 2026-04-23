@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS: MDPSettings = {
 	separateDarkMode: false,
 	pluginDefault: "user",
 	autoInsertFrontmatter: false,
-	statusBarStatsEnabled: false,
+	statusBarStatsEnabled: true,
 	statusBarStatsMode: "percent",
 };
 

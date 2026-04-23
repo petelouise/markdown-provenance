@@ -101,6 +101,8 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 | **Tint colours** | Customize the background color for each provenance type |
 | **Default provenance type** | Fallback for notes without a frontmatter key; the matching type renders without tint |
 | **Auto-add provenance to new notes** | Automatically insert a `provenance:` key into newly created notes |
+| **Show provenance stats** | Display compact current-note provenance statistics in the status bar |
+| **Status bar format** | Show the status summary as percentages or raw character counts |
 
 ---
 

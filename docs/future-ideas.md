@@ -23,14 +23,16 @@ decorations when the cursor is outside the marker line.
 ### Provenance summary / statistics
 Use the status bar as the primary surface for the current note, since it keeps
 the signal visible while writing without pulling attention away from the text.
-A compact summary like `41% assistant · 52% self · 7% quote` makes the plugin's
+A compact summary like `41% assistant · 52% user · 7% external` makes the plugin's
 purpose legible at a glance, with a toggle to switch between percentages and
 counts depending on whether the user wants composition or raw volume. Scope
 should be explicit: default to the current note, with a vault-level view as an
 optional expansion for broader research workflows. Settings should configure the
 feature and preview its display, not become the main statistics home; the live
 status bar summary is the product, while settings are for choosing how that
-summary behaves.
+summary behaves. For users who hide the status bar, prefer a compact settings
+preview and future command-palette action over a permanent sidebar; a sidebar
+only earns its keep if vault-wide analysis, filtering, or trends become useful.
 
 ### Hover-only mode + hotkey toggle
 Option to hide all tints by default and only show them on hover over a span,

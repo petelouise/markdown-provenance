@@ -78,6 +78,7 @@ export class MDPSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.pluginDefault = value as ProvenanceWord | "none";
 						await this.plugin.saveSettings();
+						void this.plugin.updateStatusBar();
 						// Grey out auto-insert when default is "none"
 						autoInsertSetting.setDisabled(value === "none");
 					});
@@ -102,7 +103,9 @@ export class MDPSettingTab extends PluginSettingTab {
 		autoInsertSetting.setDisabled(this.plugin.settings.pluginDefault === "none");
 
 		// ── Status bar ───────────────────────────────────────────────────────
-		containerEl.createEl("h3", { text: "Status bar" });
+		new Setting(containerEl)
+			.setName("Status bar")
+			.setHeading();
 		containerEl.createEl("p", {
 			text: "Show compact provenance statistics for the active Markdown file.",
 			cls: "setting-item-description",

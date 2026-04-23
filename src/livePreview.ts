@@ -92,12 +92,12 @@ function buildDecorations(view: EditorView, plugin: MDPPluginContext): Decoratio
 	for (const span of spans) {
 		const classes = ["mdp-span"];
 		if (span.provenance === def) classes.push("mdp-default");
+		const cursorInSpan = cursorHead >= span.from && cursorHead <= span.to;
+		if (cursorInSpan) classes.push("mdp-active");
 		const mark = Decoration.mark({
 			class: classes.join(" "),
 			attributes: { "data-provenance": span.provenance },
 		});
-
-		const cursorInSpan = cursorHead >= span.from && cursorHead <= span.to;
 
 		if (cursorInSpan) {
 			entries.push({ from: span.from, to: span.to, deco: mark });
@@ -149,7 +149,12 @@ function addBlockDecorations(
 				entries.push({
 					from: line.from,
 					to: line.from,
-					deco: blockLineDecoration(activeFence, def, "mdp-block-fenced"),
+					deco: blockLineDecoration(
+						activeFence,
+						def,
+						"mdp-block-fenced",
+						cursorOnLine(cursorHead, line.from, line.to),
+					),
 				});
 			}
 			continue;
@@ -174,7 +179,12 @@ function addBlockDecorations(
 		entries.push({
 			from: line.from,
 			to: line.from,
-			deco: blockLineDecoration(provenance, def, "mdp-block-line"),
+			deco: blockLineDecoration(
+				provenance,
+				def,
+				"mdp-block-line",
+				cursorOnLine(cursorHead, line.from, line.to),
+			),
 		});
 		if (!cursorOnLine(cursorHead, line.from, line.to)) {
 			entries.push({ from: line.from, to: line.from + lineMatch[0].length, deco: HIDE });
@@ -186,9 +196,11 @@ function blockLineDecoration(
 	provenance: ProvenanceWord,
 	def: ProvenanceWord | null,
 	extraClass: string,
+	active: boolean,
 ): Decoration {
 	const classes = ["mdp-block", extraClass];
 	if (provenance === def) classes.push("mdp-default");
+	if (active) classes.push("mdp-active");
 	return Decoration.line({
 		class: classes.join(" "),
 		attributes: { "data-provenance": provenance },

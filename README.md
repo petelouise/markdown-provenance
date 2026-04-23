@@ -99,10 +99,14 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 | Setting | Description |
 |---------|-------------|
 | **Tint colours** | Customize the background color for each provenance type |
+| **Default tint visibility** | Show tints all the time, or only reveal them when hovering marked text |
+| **Show ribbon toggle** | Add a left-ribbon button that temporarily flips tint visibility |
 | **Default provenance type** | Fallback for notes without a frontmatter key; the matching type renders without tint |
 | **Auto-add provenance to new notes** | Automatically insert a `provenance:` key into newly created notes |
 | **Show provenance stats** | Display compact current-note provenance statistics in the status bar |
 | **Status bar format** | Show the status summary as percentages or raw character counts |
+
+Use the **Toggle provenance tints** command from the command palette or Obsidian's Hotkeys settings to bind your own shortcut.
 
 ---
 

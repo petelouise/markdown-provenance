@@ -1,4 +1,4 @@
-import { MarkdownView, Plugin, TFile } from "obsidian";
+import { MarkdownView, Notice, Plugin, TFile } from "obsidian";
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 import { normalizeProvenance } from "./provenance";
@@ -16,12 +16,23 @@ export default class MDPPlugin extends Plugin {
 	private statusBarEl: HTMLElement | null = null;
 	private statusBarTimer: number | null = null;
 	private statusBarRequest = 0;
+	private tintVisibilityInverted = false;
+	private ribbonToggleEl: HTMLElement | null = null;
 
 	async onload() {
 		await this.loadSettings();
 		this.applyStyles();
+		this.applyTintVisibility();
+
 		this.statusBarEl = this.addStatusBarItem();
 		this.statusBarEl.addClass("mdp-status-bar");
+
+		this.addCommand({
+			id: "toggle-provenance-tints",
+			name: "Toggle provenance tints",
+			callback: () => this.toggleTintVisibility(),
+		});
+		this.syncRibbonToggle();
 
 		// Live Preview (CodeMirror 6) — pass plugin as context
 		this.registerEditorExtension(buildLivePreviewExtension(this));
@@ -85,6 +96,11 @@ export default class MDPPlugin extends Plugin {
 		if (this.statusBarTimer !== null) window.clearTimeout(this.statusBarTimer);
 		this.statusBarEl?.remove();
 		document.getElementById(STYLE_EL_ID)?.remove();
+		document.body.classList.remove(
+			"mdp-tints-hover-only",
+			"mdp-tints-force-visible",
+			"mdp-tints-force-hidden",
+		);
 		clearFences();
 	}
 
@@ -170,5 +186,69 @@ export default class MDPPlugin extends Plugin {
 		item.setText(label);
 		item.setAttr("title", `${file.path} • ${label}`);
 		item.show();
+	}
+
+	applyTintVisibility() {
+		document.body.classList.toggle(
+			"mdp-tints-hover-only",
+			this.settings.tintVisibility === "hover",
+		);
+		document.body.classList.toggle(
+			"mdp-tints-force-visible",
+			this.settings.tintVisibility === "hover" && this.tintVisibilityInverted,
+		);
+		document.body.classList.toggle(
+			"mdp-tints-force-hidden",
+			this.settings.tintVisibility === "always" && this.tintVisibilityInverted,
+		);
+		this.updateRibbonToggleLabel();
+	}
+
+	resetTintVisibilityOverride() {
+		this.tintVisibilityInverted = false;
+		this.applyTintVisibility();
+	}
+
+	syncRibbonToggle() {
+		if (!this.settings.showRibbonToggle) {
+			this.ribbonToggleEl?.remove();
+			this.ribbonToggleEl = null;
+			return;
+		}
+		if (this.ribbonToggleEl) {
+			this.updateRibbonToggleLabel();
+			return;
+		}
+		this.ribbonToggleEl = this.addRibbonIcon(
+			"eye",
+			"Toggle provenance tints",
+			() => this.toggleTintVisibility(),
+		);
+		this.ribbonToggleEl.classList.add("mdp-ribbon-toggle");
+		this.updateRibbonToggleLabel();
+	}
+
+	private toggleTintVisibility() {
+		this.tintVisibilityInverted = !this.tintVisibilityInverted;
+		this.applyTintVisibility();
+		new Notice(this.currentTintVisibilityLabel());
+	}
+
+	private updateRibbonToggleLabel() {
+		if (!this.ribbonToggleEl) return;
+		this.ribbonToggleEl.setAttribute("aria-label", this.currentTintVisibilityLabel());
+		this.ribbonToggleEl.setAttribute("title", this.currentTintVisibilityLabel());
+		this.ribbonToggleEl.classList.toggle("is-active", this.tintVisibilityInverted);
+	}
+
+	private currentTintVisibilityLabel(): string {
+		if (this.settings.tintVisibility === "hover") {
+			return this.tintVisibilityInverted
+				? "Provenance tints revealed"
+				: "Provenance tints shown on hover";
+		}
+		return this.tintVisibilityInverted
+			? "Provenance tints hidden"
+			: "Provenance tints visible";
 	}
 }

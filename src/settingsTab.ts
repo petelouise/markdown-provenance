@@ -8,6 +8,9 @@ interface MDPPluginHost {
 	saveSettings(): Promise<void>;
 	applyStyles(): void;
 	updateStatusBar(): Promise<void>;
+	applyTintVisibility(): void;
+	resetTintVisibilityOverride(): void;
+	syncRibbonToggle(): void;
 }
 
 export class MDPSettingTab extends PluginSettingTab {
@@ -54,6 +57,48 @@ export class MDPSettingTab extends PluginSettingTab {
 		this.addColorSetting("Assistant", "AI-generated text  (%a{...})",              "assistant", dm);
 		this.addColorSetting("External",  "Third-party source  (%q{...})",             "external",  dm);
 		this.addColorSetting("Unknown",   "Unclear provenance  (%?{...})",             "unknown",   dm);
+
+		// ── Visibility ────────────────────────────────────────────────────────
+		new Setting(containerEl).setName("Tint visibility").setHeading();
+
+		new Setting(containerEl)
+			.setName("Default tint visibility")
+			.setDesc(
+				"Choose whether provenance tints are visible while you write, or " +
+				"only appear when you hover over marked text. The command palette " +
+				"toggle temporarily flips this behavior."
+			)
+			.addDropdown(drop => {
+				drop
+					.addOption("always", "Always show tints")
+					.addOption("hover", "Show on hover")
+					.setValue(this.plugin.settings.tintVisibility)
+					.onChange((value) => {
+						void (async () => {
+							this.plugin.settings.tintVisibility = value as MDPSettings["tintVisibility"];
+							await this.plugin.saveSettings();
+							this.plugin.resetTintVisibilityOverride();
+						})();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Show ribbon toggle")
+			.setDesc(
+				"Add a left-ribbon button for quickly switching between the default " +
+				"visibility mode and the temporary audit view."
+			)
+			.addToggle(toggle => {
+				toggle
+					.setValue(this.plugin.settings.showRibbonToggle)
+					.onChange((value) => {
+						void (async () => {
+							this.plugin.settings.showRibbonToggle = value;
+							await this.plugin.saveSettings();
+							this.plugin.syncRibbonToggle();
+						})();
+					});
+			});
 
 		// ── Default provenance ────────────────────────────────────────────────
 		containerEl.createEl("h3", { text: "Default provenance" });

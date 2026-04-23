@@ -32,6 +32,10 @@
   background-color: transparent;
 }
 
+.mdp-hidden {
+  display: none !important;
+}
+
 /* ── Block-level provenance ──────────────────────────────────────────────── */
 
 /*

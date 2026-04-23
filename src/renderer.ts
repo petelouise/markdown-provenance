@@ -53,10 +53,13 @@ const SIGIL_MID_RE: Readonly<Record<BlockSigil, RegExp>> = {
 
 interface FenceState {
 	sigil: BlockSigil;
-	elements: HTMLElement[];
 }
 
-// Module-level state: one active fence per source path at a time.
+interface RenderSectionInfo {
+	lineStart: number;
+}
+
+// Module-level state: one active fence per rendered document at a time.
 // Relies on Obsidian calling post-processors in document order (top to bottom).
 // Call clearFences() from the plugin's onunload() to avoid accumulating
 // stale entries from renamed or deleted files.
@@ -83,9 +86,14 @@ export function processElement(
 	el: HTMLElement,
 	docDefault: ProvenanceWord | null,
 	pluginDefault: MDPSettings["pluginDefault"],
-	sourcePath = "",
+	renderKey = "",
+	sectionInfo?: RenderSectionInfo | null,
 ): void {
 	const def = effectiveDefault(docDefault, pluginDefault);
+
+	if (renderKey && sectionInfo?.lineStart === 0) {
+		activeFences.delete(renderKey);
+	}
 
 	// Inline spans (existing pass — runs first so block stripping sees clean nodes)
 	const textNodes = collectTextNodes(el);
@@ -94,8 +102,8 @@ export function processElement(
 	}
 
 	// Block markers
-	processLineBlock(el, def, sourcePath);
-	processFencedBlock(el, def, sourcePath);
+	processLineBlock(el, def, renderKey);
+	processFencedBlock(el, def, renderKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +177,7 @@ function processLineBlock(
 		el.tagName === "P"
 			? [el]
 			: Array.from(el.querySelectorAll<HTMLElement>("p"));
+	if (paras.length === 0) paras.push(el);
 
 	for (const p of paras) {
 		const sigil = detectLineBlockSigil(p);
@@ -186,14 +195,7 @@ function processLineBlock(
  */
 function detectLineBlockSigil(p: HTMLElement): BlockSigil | null {
 	// Reconstruct virtual lines: treat <br> as \n
-	let text = "";
-	for (const node of Array.from(p.childNodes)) {
-		if (node.nodeType === Node.TEXT_NODE) {
-			text += node.textContent ?? "";
-		} else if ((node as Element).tagName === "BR") {
-			text += "\n";
-		}
-	}
+	const text = getTextWithBreaks(p);
 
 	const match = text.match(BLOCK_LINE_RE);
 	if (!match) return null;
@@ -231,7 +233,7 @@ function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
 	const midRe   = SIGIL_MID_RE[sigil];
 
 	let afterLineStart = true;
-	for (const node of Array.from(el.childNodes) as ChildNode[]) {
+	for (const node of iterateTextAndBreakNodes(el)) {
 		if (node.nodeType === Node.TEXT_NODE) {
 			let text = node.textContent ?? "";
 			if (afterLineStart) {
@@ -247,6 +249,35 @@ function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
 	}
 }
 
+function getTextWithBreaks(el: HTMLElement): string {
+	let text = "";
+	for (const node of iterateTextAndBreakNodes(el)) {
+		if (node.nodeType === Node.TEXT_NODE) {
+			text += node.textContent ?? "";
+		} else {
+			text += "\n";
+		}
+	}
+	return text;
+}
+
+function iterateTextAndBreakNodes(el: HTMLElement): ChildNode[] {
+	const nodes: ChildNode[] = [];
+	const visit = (node: ChildNode) => {
+		if (node.nodeType === Node.TEXT_NODE) {
+			nodes.push(node);
+			return;
+		}
+		if ((node as Element).tagName === "BR") {
+			nodes.push(node);
+			return;
+		}
+		for (const child of Array.from(node.childNodes)) visit(child);
+	};
+	for (const child of Array.from(el.childNodes)) visit(child);
+	return nodes;
+}
+
 // ---------------------------------------------------------------------------
 // Fenced block markers: %%%a … %%%
 // ---------------------------------------------------------------------------
@@ -257,7 +288,7 @@ function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
  */
 function isFenceCandidate(el: HTMLElement): boolean {
 	if (el.tagName === "P") return true;
-	if (el.children.length === 1 && (el.children[0] as HTMLElement).tagName === "P") return true;
+	if (el.children.length === 1 && el.firstElementChild?.tagName === "P") return true;
 	// Bare text node with no element children (unusual but possible)
 	if (el.children.length === 0 && el.childNodes.length > 0) return true;
 	return false;
@@ -272,22 +303,17 @@ function processFencedBlock(
 	const fence = activeFences.get(sourcePath);
 	const text = el.textContent?.trim() ?? "";
 
-	// Closing fence: apply provenance to all collected elements
+	// Closing fence: hide the delimiter and end the active region.
 	if (fence && isFenceCandidate(el) && FENCE_CLOSE_RE.test(text)) {
-		const word = LETTER_TO_WORD[fence.sigil];
-		for (const fenceEl of fence.elements) {
-			fenceEl.classList.add("mdp-block");
-			fenceEl.dataset.provenance = word;
-			if (word === def) fenceEl.classList.add("mdp-default");
-		}
-		el.style.display = "none";
+		el.classList.add("mdp-hidden");
 		activeFences.delete(sourcePath);
 		return;
 	}
 
-	// Inside an active fence: collect this element for deferred styling
+	// Inside an active fence: style immediately. Deferring until the closing
+	// delimiter is brittle because Obsidian may rerender only part of a note.
 	if (fence) {
-		fence.elements.push(el);
+		applyFenceBlock(el, fence.sigil, def);
 		return;
 	}
 
@@ -296,8 +322,19 @@ function processFencedBlock(
 		const openMatch = text.match(FENCE_OPEN_RE);
 		if (openMatch) {
 			const sigil = openMatch[1] as BlockSigil;
-			activeFences.set(sourcePath, { sigil, elements: [] });
-			el.style.display = "none";
+			activeFences.set(sourcePath, { sigil });
+			el.classList.add("mdp-hidden");
 		}
 	}
+}
+
+function applyFenceBlock(
+	el: HTMLElement,
+	sigil: BlockSigil,
+	def: ProvenanceWord | null,
+): void {
+	const word = LETTER_TO_WORD[sigil];
+	el.classList.add("mdp-block");
+	el.dataset.provenance = word;
+	if (word === def) el.classList.add("mdp-default");
 }

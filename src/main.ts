@@ -31,7 +31,13 @@ export default class MDPPlugin extends Plugin {
 				? this.app.metadataCache.getFileCache(file)?.frontmatter
 				: null;
 			const docDefault = normalizeProvenance(frontmatter?.provenance);
-			processElement(el as HTMLElement, docDefault, this.settings.pluginDefault, ctx.sourcePath);
+			processElement(
+				el,
+				docDefault,
+				this.settings.pluginDefault,
+				ctx.docId || ctx.sourcePath,
+				ctx.getSectionInfo(el),
+			);
 		});
 
 		// Auto-insert frontmatter into new notes

@@ -33,10 +33,23 @@ status bar summary is the product, while settings are for choosing how that
 summary behaves.
 
 ### Hover-only mode + hotkey toggle
-Option to hide all tints by default and only show them on hover over a span,
-or toggle all annotations on/off with a configurable hotkey. Useful when
-provenance is reference information rather than something you want to see
-constantly while writing.
+Default to a quiet reading/writing surface: hide all tints until the user
+hovers a span, then reveal just that span's provenance. Pair it with a
+configurable hotkey that temporarily toggles the whole note or vault into an
+"audit" view, so users can either inspect one phrase at a time or scan the
+entire page without changing settings.
+
+The two controls should reinforce each other, not compete. Hover is the
+lightweight, local affordance; the hotkey is the deliberate global override.
+When the hotkey is off, hover still works. When it is on, the mode should be
+obvious and reversible, with a small persistent indicator so users never lose
+track of why the note suddenly looks different.
+
+This is most useful when provenance is reference material rather than a writing
+signal: reading imported notes, checking a dense AI draft, or doing a quick
+cleanup pass before sharing. Avoid frustration by keeping selection, copy, and
+editing behavior unchanged, and by remembering the user's preference per vault
+or note so they do not have to re-disable the mode every session.
 
 ---
 

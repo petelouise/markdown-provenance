@@ -28,7 +28,7 @@ export { normalizeProvenance };
 
 // Space after > is optional, matching CommonMark's blockquote rule (both
 // `> text` and `>text` are valid). The regex mirrors that behaviour.
-const BLOCK_LINE_RE = /^%(a|u|q|\?)> ?/;
+const BLOCK_LINE_RE = /^%(a|u|q|\?)>(?!>) ?/;
 const FENCE_OPEN_RE = /^%([auq?])>>>$/;
 const FENCE_CLOSE_RE = /^%>>>$/;
 
@@ -38,17 +38,17 @@ type BlockSigil = "a" | "u" | "q" | "?";
 // SIGIL_LINE_RE: anchored (no g flag) — safe for .test() calls.
 // SIGIL_BOUNDARY_RE: global — safe for .replace() calls (replace() resets lastIndex).
 const SIGIL_LINE_RE: Readonly<Record<BlockSigil, RegExp>> = {
-	a:   /^%a> ?/,
-	u:   /^%u> ?/,
-	q:   /^%q> ?/,
-	"?": /^%\?> ?/,
+	a:   /^%a>(?!>) ?/,
+	u:   /^%u>(?!>) ?/,
+	q:   /^%q>(?!>) ?/,
+	"?": /^%\?>(?!>) ?/,
 };
 
 const SIGIL_BOUNDARY_RE: Readonly<Record<BlockSigil, RegExp>> = {
-	a:   /([\n ])%a> ?/g,
-	u:   /([\n ])%u> ?/g,
-	q:   /([\n ])%q> ?/g,
-	"?": /([\n ])%\?> ?/g,
+	a:   /([\n ])%a>(?!>) ?/g,
+	u:   /([\n ])%u>(?!>) ?/g,
+	q:   /([\n ])%q>(?!>) ?/g,
+	"?": /([\n ])%\?>(?!>) ?/g,
 };
 
 interface FenceState {
@@ -101,9 +101,10 @@ export function processElement(
 		processTextNode(node, def);
 	}
 
-	// Block markers
-	processLineBlock(el, def, renderKey);
+	// Block markers. Fenced delimiters must be checked before per-line
+	// markers because `%a>>>` starts with the `%a>` line-marker prefix.
 	processFencedBlock(el, def, renderKey);
+	processLineBlock(el, def, renderKey);
 }
 
 // ---------------------------------------------------------------------------

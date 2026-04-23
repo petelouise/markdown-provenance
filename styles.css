@@ -31,3 +31,62 @@
 .mdp-span.mdp-default {
   background-color: transparent;
 }
+
+/* ── Block-level provenance ──────────────────────────────────────────────── */
+
+/*
+  .mdp-block is applied to:
+    - <blockquote> elements created from %a> per-line markers
+    - block-level elements inside %%%a … %%% fenced regions
+
+  For blockquotes, Obsidian's own blockquote styles (indentation, left border)
+  provide the structural framing; we only need to thread the tint through.
+  For fenced content (<p>, <ul>, etc.), we add a subtle left border for context.
+*/
+
+blockquote.mdp-block[data-provenance="assistant"] {
+  background-color: var(--mdp-color-assistant, rgba(100, 149, 237, 0.18));
+}
+
+blockquote.mdp-block[data-provenance="user"] {
+  background-color: var(--mdp-color-user, rgba(160, 160, 176, 0.15));
+}
+
+blockquote.mdp-block[data-provenance="external"] {
+  background-color: var(--mdp-color-external, rgba(60, 179, 113, 0.18));
+}
+
+blockquote.mdp-block[data-provenance="unknown"] {
+  background-color: var(--mdp-color-unknown, rgba(255, 193, 7, 0.22));
+}
+
+/* Fenced block elements (non-blockquote) */
+:not(blockquote).mdp-block[data-provenance="assistant"] {
+  background-color: var(--mdp-color-assistant, rgba(100, 149, 237, 0.18));
+  border-left: 3px solid var(--mdp-border-assistant, rgba(100, 149, 237, 0.50));
+  padding-left: 0.75em;
+}
+
+:not(blockquote).mdp-block[data-provenance="user"] {
+  background-color: var(--mdp-color-user, rgba(160, 160, 176, 0.15));
+  border-left: 3px solid var(--mdp-border-user, rgba(160, 160, 176, 0.40));
+  padding-left: 0.75em;
+}
+
+:not(blockquote).mdp-block[data-provenance="external"] {
+  background-color: var(--mdp-color-external, rgba(60, 179, 113, 0.18));
+  border-left: 3px solid var(--mdp-border-external, rgba(60, 179, 113, 0.50));
+  padding-left: 0.75em;
+}
+
+:not(blockquote).mdp-block[data-provenance="unknown"] {
+  background-color: var(--mdp-color-unknown, rgba(255, 193, 7, 0.22));
+  border-left: 3px solid var(--mdp-border-unknown, rgba(255, 193, 7, 0.55));
+  padding-left: 0.75em;
+}
+
+/* Block whose provenance matches the effective default — suppress tint and border */
+.mdp-block.mdp-default {
+  background-color: transparent;
+  border-left-color: transparent;
+}

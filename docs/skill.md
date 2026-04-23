@@ -1,3 +1,15 @@
+---
+name: mdp
+description: >
+  Use when writing to or editing any Markdown note in a vault where MDP
+  (Markdown Provenance) is in use. This covers any task that creates, edits,
+  or adds content to .md files — even small edits, since a single inserted
+  sentence still needs %a{} wrapping. Applies to both inline span syntax
+  (%a{...}, %u{...}, %q{...}, %?{...}) and block syntax (%a>, %%%a).
+  Use this skill any time the vault contains MDP markers or the user mentions
+  provenance, attribution, or who wrote what.
+---
+
 # Markdown Provenance (MDP) — Agent Guide
 
 This document describes the MDP syntax for marking text provenance in Markdown notes. When you create or edit a Markdown note in a vault where this convention is in use, you should apply these markers to any text you generate or modify.
@@ -45,6 +57,40 @@ Spans can be nested. Inner provenance overrides outer:
 %a{This is AI text, but %u{this correction is human}, back to AI.}
 ```
 
+### Block markers
+
+When an entire paragraph has a single provenance, prefix every line with `%X>` (space after `>` is optional, matching Markdown's blockquote rule). The block continues as long as consecutive lines carry the same prefix; a blank line or a line without the prefix ends it.
+
+```markdown
+%a> This entire paragraph is AI-generated.
+
+%a> This one too.
+%a> It spans multiple lines; every line carries the prefix.
+
+%u> This paragraph is human-authored.
+```
+
+For multi-paragraph regions under the same provenance, use a fenced form:
+
+```markdown
+%%%a
+This is AI paragraph one.
+
+This is AI paragraph two. Still inside the fence.
+%%%
+```
+
+The closing `%%%` (alone on a line) ends the fence regardless of the opening sigil. Inline spans inside a block or fence still work and override the block provenance for their span:
+
+```markdown
+%a> The assistant wrote this. %u{I inserted this correction.} The assistant continued.
+```
+
+**When to use blocks vs. inline spans:**
+- Use inline `%a{...}` for short runs of text within a paragraph the human is primarily authoring.
+- Use `%a>` for paragraphs you (the assistant) wrote entirely.
+- Use `%%%a … %%%` for sections of several paragraphs you wrote entirely.
+
 ### Escaping
 
 - `\%` → literal `%` (not a span opener)
@@ -72,7 +118,7 @@ Accepted aliases: `ai` → `assistant`, `human` → `user`, `self` → `user`, `
 
 When you write or edit a Markdown note:
 
-1. **Wrap everything you write in `%a{...}`** unless the note's frontmatter sets `provenance: assistant`, in which case you may leave your text unmarked.
+1. **Mark everything you write.** Use inline `%a{...}` for short runs of text, `%a>` for whole paragraphs you authored, and `%%%a … %%%` for multi-paragraph sections you authored — unless the note's frontmatter sets `provenance: assistant`, in which case you may leave your text unmarked.
 
 2. **Do not re-mark text that was already there.** If user-authored text (`%u{...}` or unmarked in a `provenance: user` note) exists, leave it as-is unless you are explicitly rewriting it.
 
@@ -83,6 +129,8 @@ When you write or edit a Markdown note:
 5. **Preserve existing markers.** Never strip or flatten provenance markup that is already present.
 
 6. **If in doubt about a passage's origin,** use `%?{...}`.
+
+7. **Choose the right granularity.** A full paragraph you wrote → `%a>`. A sentence you inserted in someone else's paragraph → `%a{...}`. A multi-paragraph section → `%%%a … %%%`.
 
 ---
 
@@ -130,7 +178,8 @@ The philosopher wrote: %q{The unexamined life is not worth living.}
 
 To make this guide available to your agent automatically:
 
-- **Claude Code:** Add `@path/to/skill.md` to your vault's `CLAUDE.md`, or add an import to your user-level `~/.claude/CLAUDE.md`.
-- **Other agents:** Include the contents of this file in the agent's system prompt, or reference it from whatever project-level instruction file your agent system supports (e.g. `AGENTS.md`, `.cursorrules`, `AI.md`).
+- **Claude Code (Superpowers skill):** This file has Superpowers-compatible frontmatter. Point the Skill tool at `docs/skill.md`, or copy it into your vault and reference it from `CLAUDE.md` with `@path/to/skill.md`.
+- **Claude Code (manual):** Add `@path/to/skill.md` to your vault's `CLAUDE.md`, or import it in your user-level `~/.claude/CLAUDE.md`.
+- **Other agents:** Include the contents of this file in the agent's system prompt, or reference it from whatever project-level instruction file your agent system supports (e.g. `AGENTS.md`, `.cursorrules`, `AI.md`, `GEMINI.md`).
 
 The guide should be loaded whenever the agent is creating or editing Markdown files in a vault where MDP is in use.

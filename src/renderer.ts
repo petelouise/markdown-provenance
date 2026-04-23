@@ -3,6 +3,10 @@
  *
  * Walks the DOM of a rendered Markdown section, finds text nodes containing
  * MDP provenance syntax, and replaces them with styled <span> elements.
+ *
+ * Also handles block-level markers:
+ *   - Per-line: %a> text (each line carries the prefix; rendered as <blockquote>)
+ *   - Fenced:   %%%a … %%% (tint only, no blockquote indent)
  */
 
 import { parse, Segment } from "./parser";
@@ -19,31 +23,83 @@ export type { ProvenanceWord };
 export { normalizeProvenance };
 
 // ---------------------------------------------------------------------------
+// Block-marker regexes
+// ---------------------------------------------------------------------------
+
+// Space after > is optional, matching CommonMark's blockquote rule (both
+// `> text` and `>text` are valid). The regex mirrors that behaviour.
+const BLOCK_LINE_RE = /^%(a|u|q|\?)> ?/;
+const FENCE_OPEN_RE = /^%%%([auq?])$/;
+const FENCE_CLOSE_RE = /^%%%$/;
+
+type BlockSigil = "a" | "u" | "q" | "?";
+
+// Pre-built per-sigil regexes — avoids per-call RegExp allocation.
+// SIGIL_LINE_RE: anchored (no g flag) — safe for .test() calls.
+// SIGIL_MID_RE:  global — safe for .replace() calls (replace() resets lastIndex).
+const SIGIL_LINE_RE: Readonly<Record<BlockSigil, RegExp>> = {
+	a:   /^%a> ?/,
+	u:   /^%u> ?/,
+	q:   /^%q> ?/,
+	"?": /^%\?> ?/,
+};
+
+const SIGIL_MID_RE: Readonly<Record<BlockSigil, RegExp>> = {
+	a:   / %a> ?/g,
+	u:   / %u> ?/g,
+	q:   / %q> ?/g,
+	"?": / %\?> ?/g,
+};
+
+interface FenceState {
+	sigil: BlockSigil;
+	elements: HTMLElement[];
+}
+
+// Module-level state: one active fence per source path at a time.
+// Relies on Obsidian calling post-processors in document order (top to bottom).
+// Call clearFences() from the plugin's onunload() to avoid accumulating
+// stale entries from renamed or deleted files.
+const activeFences = new Map<string, FenceState>();
+
+/** Release all fence state — call from the plugin's onunload(). */
+export function clearFences(): void {
+	activeFences.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
- * Walk all text nodes in `el`, parse MDP syntax, and replace any that contain
- * provenance spans with the corresponding DOM structure.
+ * Process a rendered section element: inline spans + block markers.
  *
  * @param el             Section element from Obsidian's post-processor.
  * @param docDefault     Provenance declared in the note's frontmatter, or null.
  * @param pluginDefault  Plugin-level fallback from settings.
+ * @param sourcePath     Vault path of the note (used for cross-section fence state).
  */
 export function processElement(
 	el: HTMLElement,
 	docDefault: ProvenanceWord | null,
-	pluginDefault: MDPSettings["pluginDefault"]
+	pluginDefault: MDPSettings["pluginDefault"],
+	sourcePath = "",
 ): void {
 	const def = effectiveDefault(docDefault, pluginDefault);
+
+	// Inline spans (existing pass — runs first so block stripping sees clean nodes)
 	const textNodes = collectTextNodes(el);
 	for (const node of textNodes) {
 		processTextNode(node, def);
 	}
+
+	// Block markers
+	processLineBlock(el, def, sourcePath);
+	processFencedBlock(el, def, sourcePath);
 }
 
 // ---------------------------------------------------------------------------
-// DOM helpers
+// Inline helpers (unchanged from original)
 // ---------------------------------------------------------------------------
 
 function collectTextNodes(root: HTMLElement): Text[] {
@@ -77,7 +133,7 @@ function processTextNode(node: Text, def: ProvenanceWord | null): void {
 
 function buildFragment(
 	segments: Segment[],
-	def: ProvenanceWord | null
+	def: ProvenanceWord | null,
 ): DocumentFragment {
 	const frag = document.createDocumentFragment();
 	for (const seg of segments) {
@@ -94,4 +150,154 @@ function buildFragment(
 		}
 	}
 	return frag;
+}
+
+// ---------------------------------------------------------------------------
+// Per-line block markers: %a> text
+// ---------------------------------------------------------------------------
+
+function processLineBlock(
+	el: HTMLElement,
+	def: ProvenanceWord | null,
+	sourcePath: string,
+): void {
+	// Skip if this section is already claimed by an open fenced block — the
+	// fence's provenance is authoritative and we don't want double-styling.
+	if (sourcePath && activeFences.has(sourcePath)) return;
+
+	const paras: HTMLElement[] =
+		el.tagName === "P"
+			? [el]
+			: Array.from(el.querySelectorAll<HTMLElement>("p"));
+
+	for (const p of paras) {
+		const sigil = detectLineBlockSigil(p);
+		if (sigil) applyLineBlock(p, sigil, def);
+	}
+}
+
+/**
+ * Returns the block sigil if every non-empty "line" of the paragraph starts
+ * with the same %X> prefix (space required), otherwise null.
+ *
+ * Handles two Obsidian line-break modes:
+ *   - <br>-separated lines (strict line breaks enabled)
+ *   - space-joined content (default: consecutive lines merged into one paragraph)
+ */
+function detectLineBlockSigil(p: HTMLElement): BlockSigil | null {
+	// Reconstruct virtual lines: treat <br> as \n
+	let text = "";
+	for (const node of Array.from(p.childNodes)) {
+		if (node.nodeType === Node.TEXT_NODE) {
+			text += node.textContent ?? "";
+		} else if ((node as Element).tagName === "BR") {
+			text += "\n";
+		}
+	}
+
+	const match = text.match(BLOCK_LINE_RE);
+	if (!match) return null;
+	const sigil = match[1] as BlockSigil;
+
+	// All non-empty lines must start with the same sigil (using pre-built regex)
+	const lineRe = SIGIL_LINE_RE[sigil];
+	const allMatch = text
+		.split("\n")
+		.every((line) => line.trim() === "" || lineRe.test(line));
+
+	return allMatch ? sigil : null;
+}
+
+function applyLineBlock(
+	p: HTMLElement,
+	sigil: BlockSigil,
+	def: ProvenanceWord | null,
+): void {
+	stripLineBlockPrefixes(p, sigil);
+
+	// Swap <p> for <blockquote> so it inherits Obsidian's blockquote styling
+	const bq = p.ownerDocument.createElement("blockquote");
+	bq.classList.add("mdp-block");
+	const word = LETTER_TO_WORD[sigil];
+	bq.dataset.provenance = word;
+	if (word === def) bq.classList.add("mdp-default");
+
+	while (p.firstChild) bq.appendChild(p.firstChild);
+	p.replaceWith(bq);
+}
+
+function stripLineBlockPrefixes(el: HTMLElement, sigil: BlockSigil): void {
+	const startRe = SIGIL_LINE_RE[sigil];
+	const midRe   = SIGIL_MID_RE[sigil];
+
+	let afterLineStart = true;
+	for (const node of Array.from(el.childNodes) as ChildNode[]) {
+		if (node.nodeType === Node.TEXT_NODE) {
+			let text = node.textContent ?? "";
+			if (afterLineStart) {
+				text = text.replace(startRe, "");
+				afterLineStart = false;
+			}
+			// Space-joined mode: " %X> " in the middle of a single text node
+			text = text.replace(midRe, " ");
+			node.textContent = text;
+		} else if ((node as Element).tagName === "BR") {
+			afterLineStart = true;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fenced block markers: %%%a … %%%
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true only when el is (or wraps) a single paragraph whose sole text
+ * content could be a fence marker — prevents false positives on containers.
+ */
+function isFenceCandidate(el: HTMLElement): boolean {
+	if (el.tagName === "P") return true;
+	if (el.children.length === 1 && (el.children[0] as HTMLElement).tagName === "P") return true;
+	// Bare text node with no element children (unusual but possible)
+	if (el.children.length === 0 && el.childNodes.length > 0) return true;
+	return false;
+}
+
+function processFencedBlock(
+	el: HTMLElement,
+	def: ProvenanceWord | null,
+	sourcePath: string,
+): void {
+	if (!sourcePath) return;
+	const fence = activeFences.get(sourcePath);
+	const text = el.textContent?.trim() ?? "";
+
+	// Closing fence: apply provenance to all collected elements
+	if (fence && isFenceCandidate(el) && FENCE_CLOSE_RE.test(text)) {
+		const word = LETTER_TO_WORD[fence.sigil];
+		for (const fenceEl of fence.elements) {
+			fenceEl.classList.add("mdp-block");
+			fenceEl.dataset.provenance = word;
+			if (word === def) fenceEl.classList.add("mdp-default");
+		}
+		el.style.display = "none";
+		activeFences.delete(sourcePath);
+		return;
+	}
+
+	// Inside an active fence: collect this element for deferred styling
+	if (fence) {
+		fence.elements.push(el);
+		return;
+	}
+
+	// Opening fence: begin tracking (overwrites any stale prior state for this path)
+	if (isFenceCandidate(el)) {
+		const openMatch = text.match(FENCE_OPEN_RE);
+		if (openMatch) {
+			const sigil = openMatch[1] as BlockSigil;
+			activeFences.set(sourcePath, { sigil, elements: [] });
+			el.style.display = "none";
+		}
+	}
 }

@@ -34,6 +34,22 @@ const FENCE_CLOSE_RE = /^%>>>$/;
 
 type BlockSigil = "a" | "u" | "q" | "?";
 
+const MARKDOWN_BLOCK_TAGS = new Set([
+	"BLOCKQUOTE",
+	"H1",
+	"H2",
+	"H3",
+	"H4",
+	"H5",
+	"H6",
+	"HR",
+	"OL",
+	"P",
+	"PRE",
+	"TABLE",
+	"UL",
+]);
+
 // Pre-built per-sigil regexes — avoids per-call RegExp allocation.
 // SIGIL_LINE_RE: anchored (no g flag) — safe for .test() calls.
 // SIGIL_BOUNDARY_RE: global — safe for .replace() calls (replace() resets lastIndex).
@@ -303,32 +319,50 @@ function processFencedBlock(
 	sourcePath: string,
 ): void {
 	if (!sourcePath) return;
-	const fence = activeFences.get(sourcePath);
-	const text = el.textContent?.trim() ?? "";
 
-	// Closing fence: hide the delimiter and end the active region.
-	if (fence && isFenceCandidate(el) && FENCE_CLOSE_RE.test(text)) {
-		el.classList.add("mdp-hidden");
-		activeFences.delete(sourcePath);
-		return;
-	}
+	for (const blockEl of collectFenceBlocks(el)) {
+		const fence = activeFences.get(sourcePath);
+		const text = blockEl.textContent?.trim() ?? "";
 
-	// Inside an active fence: style immediately. Deferring until the closing
-	// delimiter is brittle because Obsidian may rerender only part of a note.
-	if (fence) {
-		applyFenceBlock(el, fence.sigil, def);
-		return;
-	}
+		// Closing fence: hide the delimiter and end the active region.
+		if (fence && isFenceCandidate(blockEl) && FENCE_CLOSE_RE.test(text)) {
+			blockEl.classList.add("mdp-hidden");
+			activeFences.delete(sourcePath);
+			continue;
+		}
 
-	// Opening fence: begin tracking (overwrites any stale prior state for this path)
-	if (isFenceCandidate(el)) {
-		const openMatch = text.match(FENCE_OPEN_RE);
-		if (openMatch) {
-			const sigil = openMatch[1] as BlockSigil;
-			activeFences.set(sourcePath, { sigil });
-			el.classList.add("mdp-hidden");
+		// Inside an active fence: style immediately. Deferring until the closing
+		// delimiter is brittle because Obsidian may rerender only part of a note.
+		if (fence) {
+			applyFenceBlock(blockEl, fence.sigil, def);
+			continue;
+		}
+
+		// Opening fence: begin tracking (overwrites any stale prior state for this path)
+		if (isFenceCandidate(blockEl)) {
+			const openMatch = text.match(FENCE_OPEN_RE);
+			if (openMatch) {
+				const sigil = openMatch[1] as BlockSigil;
+				activeFences.set(sourcePath, { sigil });
+				blockEl.classList.add("mdp-hidden");
+			}
 		}
 	}
+}
+
+function collectFenceBlocks(el: HTMLElement): HTMLElement[] {
+	if (isFenceCandidate(el)) return [el];
+	const blocks: HTMLElement[] = [];
+	const visit = (node: Element) => {
+		if (!(node instanceof HTMLElement)) return;
+		if (node !== el && (isFenceCandidate(node) || MARKDOWN_BLOCK_TAGS.has(node.tagName))) {
+			blocks.push(node);
+			return;
+		}
+		for (const child of Array.from(node.children)) visit(child);
+	};
+	visit(el);
+	return blocks.length > 0 ? blocks : [el];
 }
 
 function applyFenceBlock(

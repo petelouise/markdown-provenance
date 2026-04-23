@@ -75,17 +75,33 @@ In Settings → Markdown Provenance, choose a default that applies to notes with
 
 ## Installation
 
-The plugin is not yet in the Obsidian community plugin directory. Install manually:
+The plugin is not yet in the Obsidian community plugin directory.
 
-1. Download the latest release from [GitHub Releases](https://github.com/petelouise/markdown-provenance-obsidian/releases)
+### Via BRAT
+
+This is the easiest way to install it in multiple vaults and pull updates later:
+
+1. Install the BRAT community plugin in Obsidian.
+2. Open Settings → BRAT → **Add Beta plugin**.
+3. Enter this repo: `petelouise/markdown-provenance`
+4. Install and enable **Markdown Provenance**.
+5. Later, use BRAT's **Check for updates** action to pull the latest GitHub release into that vault.
+
+BRAT installs from GitHub releases, so each release should include `manifest.json`, `main.js`, `styles.css`, and `versions.json`.
+
+### Manual install
+
+Install manually if you prefer:
+
+1. Download the latest release from [GitHub Releases](https://github.com/petelouise/markdown-provenance/releases)
 2. Unzip into your vault's `.obsidian/plugins/markdown-provenance/` folder
 3. Reload Obsidian and enable the plugin in Settings → Community Plugins
 
 Or clone the repo and build from source:
 
 ```sh
-git clone https://github.com/petelouise/markdown-provenance-obsidian
-cd markdown-provenance-obsidian
+git clone https://github.com/petelouise/markdown-provenance
+cd markdown-provenance
 npm install
 npm run build
 ```

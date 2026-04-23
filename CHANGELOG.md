@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1] — 2026-04-23
+
+### Fixed
+
+- Release metadata now stays in sync across `package.json`, `manifest.json`, and `versions.json`.
+- Version bump script now appends new plugin versions correctly even when multiple releases share the same `minAppVersion`.
+- Repository links now point to the live GitHub repo (`petelouise/markdown-provenance`).
+
+### Docs
+
+- Added BRAT install/update instructions for beta users across multiple vaults.
+
 ## [0.2.0] — 2026-04-12
 
 ### Breaking

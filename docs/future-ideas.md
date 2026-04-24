@@ -1,57 +1,42 @@
 # Future Ideas & Roadmap
 
-Ideas deferred from the current implementation. In rough priority order.
+Ideas deferred from the current implementation. Ordered by what looks most
+useful next.
 
 ---
 
-## Near-term (pre or post public release)
+## Recently shipped
 
-### Light/dark mode ✅ (in progress)
-Separate tint opacities for Obsidian's light and dark themes via
-`body.theme-light` / `body.theme-dark` CSS scoping.
+### Separate light/dark tint colours ✅
+Users can now keep one shared palette or enable a separate dark-mode palette
+for each provenance type.
 
-### Block markers ✅
-Reading mode (post-processor) implemented: `%a>` per-line blocks and `%a>>>`/`%>>>` fenced blocks.
-See `mdp-spec.md` §5 for the full spec.
+### Block markers in reading mode and live preview ✅
+Both `%a>` per-line blocks and `%a>>>` / `%>>>` fenced blocks are implemented.
+Inline spans still override block provenance inside those regions.
 
-### Block markers — live preview (CM6) ✅
-Live preview support for block markers is implemented with CM6 line decorations.
-Inline spans continue to use `Decoration.mark()`, while `%X>` per-line markers
-and `%X>>>`/`%>>>` fenced blocks use `Decoration.line()` plus hidden syntax
-decorations when the cursor is outside the marker line.
+### Status bar statistics ✅
+The plugin can show compact current-note provenance stats in the status bar,
+with percentage and raw-count display options.
 
-### Provenance summary / statistics
-Use the status bar as the primary surface for the current note, since it keeps
-the signal visible while writing without pulling attention away from the text.
-A compact summary like `41% assistant · 52% user · 7% external` makes the plugin's
-purpose legible at a glance, with a toggle to switch between percentages and
-counts depending on whether the user wants composition or raw volume. Scope
-should be explicit: default to the current note, with a vault-level view as an
-optional expansion for broader research workflows. Settings should configure the
-feature and preview its display, not become the main statistics home; the live
-status bar summary is the product, while settings are for choosing how that
-summary behaves. For users who hide the status bar, prefer a compact settings
-preview and future command-palette action over a permanent sidebar; a sidebar
-only earns its keep if vault-wide analysis, filtering, or trends become useful.
+### Hover reveal mode and scope controls ✅
+Embellishments can stay visible, reveal on hover, and in hover mode can expose
+either just the hovered span or the wider current section.
 
-### Hover-only mode + hotkey toggle
-Default to a quiet reading/writing surface: hide all tints until the user
-hovers a span, then reveal just that span's provenance. Pair it with a
-configurable hotkey that temporarily toggles the whole note or vault into an
-"audit" view, so users can either inspect one phrase at a time or scan the
-entire page without changing settings.
+## Next priorities
 
-The two controls should reinforce each other, not compete. Hover is the
-lightweight, local affordance; the hotkey is the deliberate global override.
-When the hotkey is off, hover still works. When it is on, the mode should be
-obvious and reversible, with a small persistent indicator so users never lose
-track of why the note suddenly looks different.
+### Accessibility
+Color is still the only visual distinction. Optional icons, pattern overlays,
+or ARIA-friendly labels would make provenance legible for more users.
 
-This is most useful when provenance is reference material rather than a writing
-signal: reading imported notes, checking a dense AI draft, or doing a quick
-cleanup pass before sharing. Avoid frustration by keeping selection, copy, and
-editing behavior unchanged, and by remembering the user's preference per vault
-or note so they do not have to re-disable the mode every session.
+### Mobile compatibility pass
+`isDesktopOnly: false` is already set, but iOS/Android behaviour still needs a
+deliberate validation pass, especially for CM6 decorations and editing flows.
+
+### Stats polish
+The current-note status bar summary ships today. The next step is light polish:
+better empty-state behaviour, a clearer settings preview, and possibly a
+command-palette surface for users who hide the status bar.
 
 ---
 
@@ -67,7 +52,7 @@ who want full control (e.g. borders, underlines, font weight).
 
 ### Custom / user-defined provenance types
 Let users define their own sigils, display names, and colors. The built-in
-four (`%a %s %q %u`) remain the defaults. Requires changes to the parser and
+four (`%a %u %q %?`) remain the defaults. Requires changes to the parser and
 live preview scanner, which currently hardcode the sigil set.
 
 ### Named authors
@@ -104,14 +89,6 @@ across their vault: "show all notes where assistant% > 50".
 When a vault is published via Obsidian Publish, the plugin doesn't run.
 A standalone CSS + minimal JS snippet could render provenance tints on
 published sites without the plugin.
-
-### Accessibility
-Color is the only visual distinction, which is a problem for colorblind users.
-Consider: optional icons per type, pattern overlays, or ARIA labels on spans.
-
-### Mobile testing
-`isDesktopOnly: false` in the manifest but untested on iOS/Android. CM6
-behaviour can differ. Needs a dedicated test pass.
 
 ### skill.md auto-deploy
 Currently `docs/skill.md` must be manually copied into each vault. The plugin

@@ -51,6 +51,24 @@ Spans can nest. The inner sigil overrides the outer for its content:
 
 Escape a literal `%` with `\%`. Escape `}` inside a span with `\}`.
 
+### Block markers
+
+When a full paragraph or section shares one provenance, use block syntax instead
+of wrapping each sentence inline:
+
+```markdown
+%a> This whole paragraph was drafted by the assistant.
+
+%a>>>
+This section is AI-generated.
+
+It can span multiple paragraphs.
+%>>>
+```
+
+Inline spans still work inside blocks and override the surrounding block
+provenance for that span.
+
 ### Document default (frontmatter)
 
 Set a default for the whole note so you only need to mark the exceptions:
@@ -114,7 +132,7 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 
 | Setting | Description |
 |---------|-------------|
-| **Embellishment colours** | Customize the base embellishment color for each provenance type |
+| **Embellishment colours** | Customize the base embellishment color for each provenance type, with an optional separate dark-mode palette |
 | **Default embellishment visibility** | Show embellishments all the time, or only reveal them on hover |
 | **Hover reveal scope** | In hover mode, reveal just the hovered mark or the whole current section |
 | **Show ribbon toggle** | Add a left-ribbon button that temporarily flips embellishment visibility |
@@ -124,6 +142,8 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 | **Status bar format** | Show the status summary as percentages or raw character counts |
 
 Use the **Toggle provenance embellishments** command from the command palette or Obsidian's Hotkeys settings to bind your own shortcut.
+
+See [docs/future-ideas.md](docs/future-ideas.md) for the current roadmap and next priorities.
 
 ---
 

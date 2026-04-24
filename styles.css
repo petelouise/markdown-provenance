@@ -13,7 +13,11 @@
 
 body:not(.mdp-provenance-labels-hidden) .mdp-span:not(.mdp-default)::before {
   content: attr(data-provenance-label);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2em;
+  box-sizing: border-box;
   margin: 0 0.25em 0 0;
   padding: 0 0.3em;
   border: 1px solid currentColor;
@@ -118,8 +122,11 @@ blockquote.mdp-block[data-provenance="unknown"] {
 
 body:not(.mdp-provenance-labels-hidden) .mdp-block:not(.mdp-default)::before {
   content: attr(data-provenance-label);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 2.4em;
+  box-sizing: border-box;
   margin-right: 0.5em;
   padding: 0 0.35em;
   border: 1px solid currentColor;
@@ -135,7 +142,8 @@ body:not(.mdp-provenance-labels-hidden) .mdp-block:not(.mdp-default)::before {
 }
 
 body.mdp-embs-hover-only:not(.mdp-embs-force-visible):not(.mdp-provenance-labels-hidden) .mdp-block:not(:hover):not(:focus-within):not(.mdp-active):not(.mdp-hover-active)::before,
-body.mdp-embs-force-hidden:not(.mdp-provenance-labels-hidden) .mdp-block::before {
+body.mdp-embs-force-hidden:not(.mdp-provenance-labels-hidden) .mdp-block::before,
+body:not(.mdp-provenance-labels-hidden) .mdp-block.mdp-block-label-hidden::before {
   display: none;
 }
 

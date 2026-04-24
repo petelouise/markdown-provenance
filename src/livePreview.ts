@@ -145,17 +145,21 @@ function addBlockDecorations(
 ): void {
 	const doc = view.state.doc;
 	let activeFence: ProvenanceWord | null = null;
+	let activeFenceLabelShown = false;
+	let previousLineBlock: ProvenanceWord | null = null;
 
 	for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
 		const line = doc.line(lineNo);
 		const trimmed = line.text.trim();
 
 		if (activeFence) {
+			previousLineBlock = null;
 			if (FENCE_CLOSE_RE.test(trimmed)) {
 				if (isLineVisible(view, line.from, line.to) && !cursorOnLine(cursorHead, line.from, line.to)) {
 					entries.push({ from: line.from, to: line.to, deco: HIDE });
 				}
 				activeFence = null;
+				activeFenceLabelShown = false;
 				continue;
 			}
 
@@ -169,26 +173,35 @@ function addBlockDecorations(
 						"mdp-block-fenced",
 						cursorOnLine(cursorHead, line.from, line.to),
 						hoverScopeIds[line.number] ?? hoverScopeIds[0] ?? "active-note:root",
+						!activeFenceLabelShown,
 					),
 				});
 			}
+			activeFenceLabelShown = true;
 			continue;
 		}
 
 		const openMatch = trimmed.match(FENCE_OPEN_RE);
 		if (openMatch) {
+			previousLineBlock = null;
 			const provenance = LETTER_TO_WORD[openMatch[1] as ProvenanceLetter];
 			if (isLineVisible(view, line.from, line.to) && !cursorOnLine(cursorHead, line.from, line.to)) {
 				entries.push({ from: line.from, to: line.to, deco: HIDE });
 			}
 			activeFence = provenance;
+			activeFenceLabelShown = false;
 			continue;
 		}
 
 		const lineMatch = line.text.match(BLOCK_LINE_RE);
-		if (!lineMatch) continue;
+		if (!lineMatch) {
+			previousLineBlock = null;
+			continue;
+		}
 
 		const provenance = LETTER_TO_WORD[lineMatch[1] as ProvenanceLetter];
+		const showLabel = provenance !== previousLineBlock;
+		previousLineBlock = provenance;
 		if (!isLineVisible(view, line.from, line.to)) continue;
 
 		entries.push({
@@ -200,6 +213,7 @@ function addBlockDecorations(
 				"mdp-block-line",
 				cursorOnLine(cursorHead, line.from, line.to),
 				hoverScopeIds[line.number] ?? hoverScopeIds[0] ?? "active-note:root",
+				showLabel,
 			),
 		});
 		if (!cursorOnLine(cursorHead, line.from, line.to)) {
@@ -214,10 +228,12 @@ function blockLineDecoration(
 	extraClass: string,
 	active: boolean,
 	hoverScopeId: string,
+	showLabel: boolean,
 ): Decoration {
 	const classes = ["mdp-block", "mdp-hover-target", extraClass];
 	if (provenance === def) classes.push("mdp-default");
 	if (active) classes.push("mdp-active");
+	if (!showLabel) classes.push("mdp-block-label-hidden");
 	return Decoration.line({
 		class: classes.join(" "),
 		attributes: {

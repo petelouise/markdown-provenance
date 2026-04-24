@@ -70,6 +70,7 @@ const SIGIL_BOUNDARY_RE: Readonly<Record<BlockSigil, RegExp>> = {
 
 interface FenceState {
 	sigil: BlockSigil;
+	labelShown: boolean;
 }
 
 interface RenderSectionInfo {
@@ -455,7 +456,8 @@ function processFencedBlock(
 				const beforeClose = lines.slice(0, closeIndex).join("\n").trim();
 				if (beforeClose) {
 					blockEl.textContent = beforeClose;
-					applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId);
+					applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId, !fence.labelShown);
+					fence.labelShown = true;
 				} else {
 					blockEl.classList.add("mdp-hidden");
 				}
@@ -467,7 +469,8 @@ function processFencedBlock(
 		// Inside an active fence: style immediately. Deferring until the closing
 		// delimiter is brittle because Obsidian may rerender only part of a note.
 		if (fence) {
-			applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId);
+			applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId, !fence.labelShown);
+			fence.labelShown = true;
 			continue;
 		}
 
@@ -491,7 +494,7 @@ function processFencedBlock(
 			} else {
 				blockEl.classList.add("mdp-hidden");
 			}
-			if (closeIndex < 0) activeFences.set(sourcePath, { sigil });
+			if (closeIndex < 0) activeFences.set(sourcePath, { sigil, labelShown: content.length > 0 });
 			continue;
 		}
 
@@ -500,7 +503,7 @@ function processFencedBlock(
 			const openMatch = text.match(FENCE_OPEN_RE);
 			if (openMatch) {
 				const sigil = openMatch[1] as BlockSigil;
-				activeFences.set(sourcePath, { sigil });
+				activeFences.set(sourcePath, { sigil, labelShown: false });
 				blockEl.classList.add("mdp-hidden");
 			}
 		}
@@ -538,11 +541,13 @@ function applyFenceBlock(
 	sigil: BlockSigil,
 	def: ProvenanceWord | null,
 	hoverScopeId = "",
+	showLabel = true,
 ): void {
 	const word = LETTER_TO_WORD[sigil];
 	el.classList.add("mdp-block");
 	el.dataset.provenance = word;
 	applyProvenanceLabel(el, word);
+	el.classList.toggle("mdp-block-label-hidden", !showLabel);
 	applyHoverScope(el, hoverScopeId, true);
 	if (word === def) el.classList.add("mdp-default");
 }

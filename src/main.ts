@@ -9,6 +9,8 @@ import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCssProps } from "./settings"
 import { computeProvenanceStats, formatProvenanceStats } from "./stats";
 import { MDPSettingTab } from "./settingsTab";
 
+type HoverBounds = { top: number; right: number; bottom: number; left: number };
+
 export default class MDPPlugin extends Plugin {
 	settings: MDPSettings;
 	private statusBarEl: HTMLElement | null = null;
@@ -296,7 +298,7 @@ export default class MDPPlugin extends Plugin {
 		}
 
 		const hoverAnchor = target instanceof Element
-			? target.closest<HTMLElement>("[data-mdp-hover-scope]")
+			? target.closest<HTMLElement>(".mdp-hover-anchor, [data-mdp-hover-scope]")
 			: null;
 		const hoverScopeId = hoverAnchor?.dataset.mdpHoverScope
 			?? this.getHoverScopeAtPoint(clientX, clientY);
@@ -323,26 +325,32 @@ export default class MDPPlugin extends Plugin {
 	private getHoverScopeAtPoint(clientX?: number, clientY?: number): string | null {
 		if (clientX === undefined || clientY === undefined) return null;
 
-		const scopes = new Map<string, DOMRect[]>();
-		for (const element of Array.from(document.querySelectorAll<HTMLElement>(".mdp-hover-target"))) {
+		const scopes = new Map<string, { rects: DOMRect[]; anchors: HTMLElement[] }>();
+		for (const element of Array.from(document.querySelectorAll<HTMLElement>(".mdp-hover-anchor"))) {
 			const hoverScopeId = element.dataset.mdpHoverScope;
 			if (!hoverScopeId) continue;
 			const rect = element.getBoundingClientRect();
 			if (rect.width === 0 && rect.height === 0) continue;
-			const rects = scopes.get(hoverScopeId) ?? [];
-			rects.push(rect);
-			scopes.set(hoverScopeId, rects);
+			const scope = scopes.get(hoverScopeId) ?? { rects: [], anchors: [] };
+			scope.rects.push(rect);
+			scope.anchors.push(element);
+			scopes.set(hoverScopeId, scope);
 		}
 
 		let best: { hoverScopeId: string; distance: number } | null = null;
-		for (const [hoverScopeId, rects] of scopes) {
-			const top = Math.min(...rects.map((rect) => rect.top)) - 16;
-			const bottom = Math.max(...rects.map((rect) => rect.bottom)) + 16;
-			const left = Math.min(...rects.map((rect) => rect.left)) - 56;
-			const right = Math.max(...rects.map((rect) => rect.right)) + 96;
-			if (clientY < top || clientY > bottom || clientX < left || clientX > right) continue;
+		for (const [hoverScopeId, scope] of scopes) {
+			const bounds = this.getHoverScopeBounds(scope.rects, scope.anchors);
+			if (!bounds) continue;
+			if (
+				clientY < bounds.top ||
+				clientY > bounds.bottom ||
+				clientX < bounds.left ||
+				clientX > bounds.right
+			) {
+				continue;
+			}
 
-			const centerY = (top + bottom) / 2;
+			const centerY = (bounds.top + bounds.bottom) / 2;
 			const distance = Math.abs(clientY - centerY);
 			if (!best || distance < best.distance) {
 				best = { hoverScopeId, distance };
@@ -350,6 +358,28 @@ export default class MDPPlugin extends Plugin {
 		}
 
 		return best?.hoverScopeId ?? null;
+	}
+
+	private getHoverScopeBounds(rects: DOMRect[], anchors: HTMLElement[]): HoverBounds | null {
+		if (rects.length === 0) return null;
+		const top = Math.min(...rects.map((rect) => rect.top)) - 8;
+		const bottom = Math.max(...rects.map((rect) => rect.bottom)) + 8;
+		const contentRect = this.getHoverContentRect(anchors);
+		const left = contentRect?.left ?? Math.max(0, Math.min(...rects.map((rect) => rect.left)) - 96);
+		const right = contentRect?.right ?? Math.min(window.innerWidth, Math.max(...rects.map((rect) => rect.right)) + 96);
+
+		return { top, right, bottom, left };
+	}
+
+	private getHoverContentRect(anchors: HTMLElement[]): DOMRect | null {
+		for (const anchor of anchors) {
+			const container = anchor.closest<HTMLElement>(
+				".markdown-preview-view, .markdown-source-view, .cm-editor, .workspace-leaf-content",
+			);
+			const rect = container?.getBoundingClientRect();
+			if (rect && rect.width > 0 && rect.height > 0) return rect;
+		}
+		return null;
 	}
 
 	private scheduleHoverScopeClear() {

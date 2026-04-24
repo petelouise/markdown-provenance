@@ -114,3 +114,13 @@ body.mdp-embs-force-hidden :not(blockquote).mdp-block {
 .mdp-ribbon-toggle.is-active {
   color: var(--interactive-accent);
 }
+
+.mdp-settings-color-input {
+  width: 4rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mdp-settings-color-input--light {
+  margin-right: 0.5rem;
+}

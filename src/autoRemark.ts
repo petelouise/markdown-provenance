@@ -19,7 +19,6 @@ import {
 	Annotation,
 	EditorState,
 	StateField,
-	Transaction,
 	TransactionSpec,
 	ChangeSet,
 	EditorSelection,

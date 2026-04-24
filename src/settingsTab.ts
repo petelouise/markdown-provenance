@@ -25,12 +25,10 @@ export class MDPSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		// ── Colours ───────────────────────────────────────────────────────────
-		containerEl.createEl("h3", { text: "Embellishment colours" });
-		containerEl.createEl("p", {
-			text: "Base embellishment colour for each provenance type. Changes take effect immediately.",
-			cls: "setting-item-description",
-		});
+		new Setting(containerEl)
+			.setName("Embellishment colours")
+			.setDesc("Base embellishment colour for each provenance type. Changes take effect immediately.")
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName("Separate dark mode colours")
@@ -120,8 +118,9 @@ export class MDPSettingTab extends PluginSettingTab {
 					});
 			});
 
-		// ── Default provenance ────────────────────────────────────────────────
-		containerEl.createEl("h3", { text: "Default provenance" });
+		new Setting(containerEl)
+			.setName("Default provenance")
+			.setHeading();
 
 		let autoInsertSetting: Setting;
 
@@ -170,11 +169,8 @@ export class MDPSettingTab extends PluginSettingTab {
 		// ── Status bar ───────────────────────────────────────────────────────
 		new Setting(containerEl)
 			.setName("Status bar")
+			.setDesc("Show compact provenance statistics for the active Markdown file.")
 			.setHeading();
-		containerEl.createEl("p", {
-			text: "Show compact provenance statistics for the active Markdown file.",
-			cls: "setting-item-description",
-		});
 
 		new Setting(containerEl)
 			.setName("Show provenance stats")
@@ -221,16 +217,12 @@ export class MDPSettingTab extends PluginSettingTab {
 
 		// Primary (light / unified) colour picker
 		setting.addText((text) => {
-			text.inputEl.type    = "color";
-			text.inputEl.value   = this.plugin.settings.colors[key];
-			text.inputEl.style.width   = "4rem";
-			text.inputEl.style.padding = "0";
-			text.inputEl.style.cursor  = "pointer";
-			if (darkMode) text.inputEl.style.marginRight = "0.5rem";
-			text.inputEl.addEventListener("input", async () => {
-				this.plugin.settings.colors[key] = text.inputEl.value;
-				await this.plugin.saveSettings();
-				this.plugin.applyStyles();
+			text.inputEl.type = "color";
+			text.inputEl.value = this.plugin.settings.colors[key];
+			text.inputEl.addClass("mdp-settings-color-input");
+			if (darkMode) text.inputEl.addClass("mdp-settings-color-input--light");
+			text.inputEl.addEventListener("input", () => {
+				void this.handleColorInput(key, text.inputEl.value, false);
 			});
 		});
 
@@ -238,17 +230,27 @@ export class MDPSettingTab extends PluginSettingTab {
 			setting.controlEl.createSpan({ text: "☾", attr: { title: "Dark mode" } });
 
 			setting.addText((text) => {
-				text.inputEl.type    = "color";
-				text.inputEl.value   = this.plugin.settings.darkColors![key];
-				text.inputEl.style.width   = "4rem";
-				text.inputEl.style.padding = "0";
-				text.inputEl.style.cursor  = "pointer";
-				text.inputEl.addEventListener("input", async () => {
-					this.plugin.settings.darkColors![key] = text.inputEl.value;
-					await this.plugin.saveSettings();
-					this.plugin.applyStyles();
+				text.inputEl.type = "color";
+				text.inputEl.value = this.plugin.settings.darkColors![key];
+				text.inputEl.addClass("mdp-settings-color-input");
+				text.inputEl.addEventListener("input", () => {
+					void this.handleColorInput(key, text.inputEl.value, true);
 				});
 			});
 		}
+	}
+
+	private async handleColorInput(
+		key: keyof MDPSettings["colors"],
+		value: string,
+		darkMode: boolean,
+	): Promise<void> {
+		if (darkMode) {
+			this.plugin.settings.darkColors![key] = value;
+		} else {
+			this.plugin.settings.colors[key] = value;
+		}
+		await this.plugin.saveSettings();
+		this.plugin.applyStyles();
 	}
 }

@@ -5,11 +5,9 @@ import { normalizeProvenance } from "./provenance";
 import { processElement, clearFences } from "./renderer";
 import { buildLivePreviewExtension } from "./livePreview";
 import { buildAutoRemarkExtension } from "./autoRemark";
-import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCSS } from "./settings";
+import { MDPSettings, DEFAULT_SETTINGS, buildDynamicCssProps } from "./settings";
 import { computeProvenanceStats, formatProvenanceStats } from "./stats";
 import { MDPSettingTab } from "./settingsTab";
-
-const STYLE_EL_ID = "mdp-dynamic-styles";
 
 export default class MDPPlugin extends Plugin {
 	settings: MDPSettings;
@@ -104,19 +102,20 @@ export default class MDPPlugin extends Plugin {
 	onunload() {
 		if (this.statusBarTimer !== null) window.clearTimeout(this.statusBarTimer);
 		this.statusBarEl?.remove();
-		document.getElementById(STYLE_EL_ID)?.remove();
 		document.body.classList.remove(
 			"mdp-embs-hover-only",
 			"mdp-embs-force-visible",
 			"mdp-embs-force-hidden",
 		);
+		this.clearStyleProps();
 		this.clearActiveHoverScope();
 		clearFences();
 	}
 
 	async loadSettings() {
 		// Load raw data first so we can migrate old key names before merging
-		const raw: Record<string, unknown> = (await this.loadData()) ?? {};
+		const rawData: unknown = await this.loadData();
+		const raw: Record<string, unknown> = isRecord(rawData) ? rawData : {};
 
 		// One-time migration: self → user, quote → external (v0.1 → v0.2)
 		if (raw.colors && typeof raw.colors === "object") {
@@ -148,13 +147,7 @@ export default class MDPPlugin extends Plugin {
 	}
 
 	applyStyles() {
-		let styleEl = document.getElementById(STYLE_EL_ID);
-		if (!styleEl) {
-			styleEl = document.createElement("style");
-			styleEl.id = STYLE_EL_ID;
-			document.head.appendChild(styleEl);
-		}
-		styleEl.textContent = buildDynamicCSS(this.settings);
+		document.body.setCssProps(buildDynamicCssProps(this.settings));
 	}
 
 	scheduleStatusBarUpdate(delay = 75): void {
@@ -322,4 +315,14 @@ export default class MDPPlugin extends Plugin {
 			? `${file.path}:root`
 			: `${file.path}:section:${currentHeadingLine}`;
 	}
+
+	private clearStyleProps(): void {
+		for (const property of Object.keys(buildDynamicCssProps(DEFAULT_SETTINGS))) {
+			document.body.style.removeProperty(property);
+		}
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
 }

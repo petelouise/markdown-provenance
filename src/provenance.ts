@@ -56,6 +56,6 @@ export function effectiveDefault(
 	pluginDefault: ProvenanceWord | "none"
 ): ProvenanceWord | null {
 	if (docDefault !== null) return docDefault;
-	if (pluginDefault !== "none") return pluginDefault as ProvenanceWord;
+	if (pluginDefault !== "none") return pluginDefault;
 	return null;
 }

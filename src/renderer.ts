@@ -13,6 +13,7 @@ import {
 	ProvenanceWord,
 	ProvenanceLetter,
 	LETTER_TO_WORD,
+	PROVENANCE_LABEL,
 	normalizeProvenance,
 	effectiveDefault,
 } from "./provenance";
@@ -277,6 +278,7 @@ function openInlineSpan(
 	const word = LETTER_TO_WORD[sigil];
 	span.classList.add("mdp-span");
 	span.dataset.provenance = word;
+	applyProvenanceLabel(span, word);
 	applyHoverScope(span, hoverScopeId, true);
 	if (word === def) span.classList.add("mdp-default");
 	appendInlineNode(parent, spanStack, span);
@@ -351,6 +353,7 @@ function applyLineBlock(
 	bq.classList.add("mdp-block");
 	const word = LETTER_TO_WORD[sigil];
 	bq.dataset.provenance = word;
+	applyProvenanceLabel(bq, word);
 	applyHoverScope(bq, hoverScopeId, true);
 	if (word === def) bq.classList.add("mdp-default");
 
@@ -539,8 +542,14 @@ function applyFenceBlock(
 	const word = LETTER_TO_WORD[sigil];
 	el.classList.add("mdp-block");
 	el.dataset.provenance = word;
+	applyProvenanceLabel(el, word);
 	applyHoverScope(el, hoverScopeId, true);
 	if (word === def) el.classList.add("mdp-default");
+}
+
+function applyProvenanceLabel(el: HTMLElement, word: ProvenanceWord): void {
+	el.dataset.provenanceLabel = PROVENANCE_LABEL[word];
+	el.setAttribute("title", `Provenance: ${word}`);
 }
 
 function applyHoverScope(

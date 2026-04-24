@@ -20,6 +20,7 @@ import {
 	ProvenanceWord,
 	ProvenanceLetter,
 	LETTER_TO_WORD,
+	PROVENANCE_LABEL,
 	normalizeProvenance,
 	effectiveDefault,
 } from "./provenance";
@@ -105,7 +106,9 @@ function buildDecorations(view: EditorView, plugin: MDPPluginContext): Decoratio
 			class: classes.join(" "),
 			attributes: {
 				"data-provenance": span.provenance,
+				"data-provenance-label": PROVENANCE_LABEL[span.provenance],
 				"data-mdp-hover-scope": span.hoverScopeId,
+				"title": `Provenance: ${span.provenance}`,
 			},
 		});
 
@@ -219,7 +222,9 @@ function blockLineDecoration(
 		class: classes.join(" "),
 		attributes: {
 			"data-provenance": provenance,
+			"data-provenance-label": PROVENANCE_LABEL[provenance],
 			"data-mdp-hover-scope": hoverScopeId,
+			"title": `Provenance: ${provenance}`,
 		},
 	});
 }

@@ -22,6 +22,14 @@ export const WORD_TO_LETTER: Record<ProvenanceWord, string> = {
 	unknown:   "?",
 };
 
+/** Human-readable labels used by visual provenance indicators. */
+export const PROVENANCE_LABEL: Record<ProvenanceWord, string> = {
+	assistant: "AI",
+	user:      "User",
+	external:  "Ext",
+	unknown:   "?",
+};
+
 /** Accepts canonical names + legacy/shorthand aliases. Case-insensitive. */
 const ALIASES: Record<string, ProvenanceWord> = {
 	// canonical

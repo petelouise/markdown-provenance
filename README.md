@@ -134,6 +134,7 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 |---------|-------------|
 | **Embellishment colours** | Customize the base embellishment color for each provenance type, with an optional separate dark-mode palette |
 | **Default embellishment visibility** | Show embellishments all the time, or only reveal them on hover |
+| **Show provenance labels** | Display compact text labels on marked provenance so colour is not the only cue |
 | **Hover reveal scope** | In hover mode, reveal just the hovered mark or the whole current section |
 | **Show ribbon toggle** | Add a left-ribbon button that temporarily flips embellishment visibility |
 | **Default provenance type** | Fallback for notes without a frontmatter key; the matching type renders without embellishment |

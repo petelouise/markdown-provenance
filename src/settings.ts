@@ -28,6 +28,7 @@ export interface MDPSettings {
 	statusBarStatsMode: StatusBarMode;
 	embellishmentVisibility: "always" | "hover";
 	embellishmentHoverScope: "mark" | "section";
+	showProvenanceLabels: boolean;
 	showRibbonToggle: boolean;
 }
 
@@ -46,6 +47,7 @@ export const DEFAULT_SETTINGS: MDPSettings = {
 	statusBarStatsMode: "percent",
 	embellishmentVisibility: "hover",
 	embellishmentHoverScope: "section",
+	showProvenanceLabels: true,
 	showRibbonToggle: true,
 };
 

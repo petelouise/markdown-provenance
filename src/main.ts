@@ -106,6 +106,7 @@ export default class MDPPlugin extends Plugin {
 			"mdp-embs-hover-only",
 			"mdp-embs-force-visible",
 			"mdp-embs-force-hidden",
+			"mdp-provenance-labels-hidden",
 		);
 		this.clearStyleProps();
 		this.clearActiveHoverScope();
@@ -206,6 +207,10 @@ export default class MDPPlugin extends Plugin {
 		document.body.classList.toggle(
 			"mdp-embs-force-hidden",
 			this.settings.embellishmentVisibility === "always" && this.embVisibilityInverted,
+		);
+		document.body.classList.toggle(
+			"mdp-provenance-labels-hidden",
+			!this.settings.showProvenanceLabels,
 		);
 		if (
 			this.settings.embellishmentVisibility !== "hover" ||

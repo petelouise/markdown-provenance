@@ -11,6 +11,27 @@
   padding: 0 1px;
 }
 
+body:not(.mdp-provenance-labels-hidden) .mdp-span:not(.mdp-default)::before {
+  content: attr(data-provenance-label);
+  display: inline-block;
+  margin: 0 0.25em 0 0;
+  padding: 0 0.3em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 0.72em;
+  font-weight: 600;
+  line-height: 1.35;
+  text-transform: uppercase;
+  vertical-align: 0.08em;
+  white-space: nowrap;
+  opacity: 0.78;
+}
+
+body.mdp-embs-hover-only:not(.mdp-embs-force-visible):not(.mdp-provenance-labels-hidden) .mdp-span:not(:hover):not(:focus-within):not(.mdp-active):not(.mdp-hover-active)::before,
+body.mdp-embs-force-hidden:not(.mdp-provenance-labels-hidden) .mdp-span::before {
+  display: none;
+}
+
 .mdp-span[data-provenance="assistant"] {
   background-color: var(--mdp-color-assistant, rgba(100, 149, 237, 0.18));
 }
@@ -93,6 +114,41 @@ blockquote.mdp-block[data-provenance="unknown"] {
   background-color: var(--mdp-color-unknown, rgba(255, 193, 7, 0.22));
   border-left: 3px solid var(--mdp-border-unknown, rgba(255, 193, 7, 0.55));
   padding-left: 0.75em;
+}
+
+body:not(.mdp-provenance-labels-hidden) .mdp-block:not(.mdp-default)::before {
+  content: attr(data-provenance-label);
+  display: inline-block;
+  min-width: 2.4em;
+  margin-right: 0.5em;
+  padding: 0 0.35em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 0.72em;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+  text-transform: uppercase;
+  vertical-align: 0.08em;
+  white-space: nowrap;
+}
+
+body.mdp-embs-hover-only:not(.mdp-embs-force-visible):not(.mdp-provenance-labels-hidden) .mdp-block:not(:hover):not(:focus-within):not(.mdp-active):not(.mdp-hover-active)::before,
+body.mdp-embs-force-hidden:not(.mdp-provenance-labels-hidden) .mdp-block::before {
+  display: none;
+}
+
+body:not(.mdp-provenance-labels-hidden) .cm-line.mdp-block:not(.mdp-default)::before {
+  position: absolute;
+  top: 0.12em;
+  right: calc(100% + 0.45em);
+  min-width: 2.8em;
+  margin: 0;
+}
+
+.cm-line.mdp-block {
+  position: relative;
 }
 
 /* Block whose provenance matches the effective default — suppress embellishment and border */

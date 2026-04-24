@@ -81,6 +81,23 @@ export class MDPSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
+			.setName("Show provenance labels")
+			.setDesc(
+				"Display compact text labels on marked provenance so colour is not the only cue."
+			)
+			.addToggle(toggle => {
+				toggle
+					.setValue(this.plugin.settings.showProvenanceLabels)
+					.onChange((value) => {
+						void (async () => {
+							this.plugin.settings.showProvenanceLabels = value;
+							await this.plugin.saveSettings();
+							this.plugin.applyEmbellishmentVisibility();
+						})();
+					});
+			});
+
+		new Setting(containerEl)
 			.setName("Hover reveal scope")
 			.setDesc(
 				"Choose whether hover reveals only the hovered mark, or every embellishment " +

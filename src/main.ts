@@ -107,6 +107,8 @@ export default class MDPPlugin extends Plugin {
 			"mdp-embs-force-visible",
 			"mdp-embs-force-hidden",
 			"mdp-provenance-labels-hidden",
+			"mdp-provenance-labels-left",
+			"mdp-provenance-labels-right",
 		);
 		this.clearStyleProps();
 		this.clearActiveHoverScope();
@@ -211,6 +213,14 @@ export default class MDPPlugin extends Plugin {
 		document.body.classList.toggle(
 			"mdp-provenance-labels-hidden",
 			!this.settings.showProvenanceLabels,
+		);
+		document.body.classList.toggle(
+			"mdp-provenance-labels-left",
+			this.settings.provenanceLabelGutter === "left",
+		);
+		document.body.classList.toggle(
+			"mdp-provenance-labels-right",
+			this.settings.provenanceLabelGutter !== "left",
 		);
 		if (
 			this.settings.embellishmentVisibility !== "hover" ||

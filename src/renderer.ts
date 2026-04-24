@@ -71,6 +71,7 @@ const SIGIL_BOUNDARY_RE: Readonly<Record<BlockSigil, RegExp>> = {
 interface FenceState {
 	sigil: BlockSigil;
 	labelShown: boolean;
+	blocks: HTMLElement[];
 }
 
 interface RenderSectionInfo {
@@ -355,6 +356,7 @@ function applyLineBlock(
 	const word = LETTER_TO_WORD[sigil];
 	bq.dataset.provenance = word;
 	applyProvenanceLabel(bq, word);
+	bq.classList.add("mdp-block-label-host");
 	applyHoverScope(bq, hoverScopeId, true);
 	if (word === def) bq.classList.add("mdp-default");
 
@@ -457,7 +459,9 @@ function processFencedBlock(
 				if (beforeClose) {
 					blockEl.textContent = beforeClose;
 					applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId, !fence.labelShown);
+					fence.blocks.push(blockEl);
 					fence.labelShown = true;
+					alignBlockLabel(fence.blocks);
 				} else {
 					blockEl.classList.add("mdp-hidden");
 				}
@@ -470,7 +474,9 @@ function processFencedBlock(
 		// delimiter is brittle because Obsidian may rerender only part of a note.
 		if (fence) {
 			applyFenceBlock(blockEl, fence.sigil, def, hoverScopeId, !fence.labelShown);
+			fence.blocks.push(blockEl);
 			fence.labelShown = true;
+			alignBlockLabel(fence.blocks);
 			continue;
 		}
 
@@ -494,7 +500,13 @@ function processFencedBlock(
 			} else {
 				blockEl.classList.add("mdp-hidden");
 			}
-			if (closeIndex < 0) activeFences.set(sourcePath, { sigil, labelShown: content.length > 0 });
+			if (closeIndex < 0) {
+				activeFences.set(sourcePath, {
+					sigil,
+					labelShown: content.length > 0,
+					blocks: content ? [blockEl] : [],
+				});
+			}
 			continue;
 		}
 
@@ -503,7 +515,7 @@ function processFencedBlock(
 			const openMatch = text.match(FENCE_OPEN_RE);
 			if (openMatch) {
 				const sigil = openMatch[1] as BlockSigil;
-				activeFences.set(sourcePath, { sigil, labelShown: false });
+				activeFences.set(sourcePath, { sigil, labelShown: false, blocks: [] });
 				blockEl.classList.add("mdp-hidden");
 			}
 		}
@@ -548,6 +560,7 @@ function applyFenceBlock(
 	el.dataset.provenance = word;
 	applyProvenanceLabel(el, word);
 	el.classList.toggle("mdp-block-label-hidden", !showLabel);
+	el.classList.toggle("mdp-block-label-host", showLabel);
 	applyHoverScope(el, hoverScopeId, true);
 	if (word === def) el.classList.add("mdp-default");
 }
@@ -555,6 +568,24 @@ function applyFenceBlock(
 function applyProvenanceLabel(el: HTMLElement, word: ProvenanceWord): void {
 	el.dataset.provenanceLabel = PROVENANCE_LABEL[word];
 	el.setAttribute("title", `Provenance: ${word}`);
+}
+
+function alignBlockLabel(blocks: HTMLElement[]): void {
+	const elements = blocks.filter((block) => block.isConnected && !block.classList.contains("mdp-hidden"));
+	const host = elements.find((block) => block.classList.contains("mdp-block-label-host"));
+	if (!host || elements.length <= 1) return;
+
+	window.requestAnimationFrame(() => {
+		const liveElements = elements.filter((block) => block.isConnected && !block.classList.contains("mdp-hidden"));
+		const liveHost = liveElements.find((block) => block.classList.contains("mdp-block-label-host"));
+		if (!liveHost) return;
+
+		const rects = liveElements.map((block) => block.getBoundingClientRect());
+		const top = Math.min(...rects.map((rect) => rect.top));
+		const bottom = Math.max(...rects.map((rect) => rect.bottom));
+		const hostTop = liveHost.getBoundingClientRect().top;
+		liveHost.style.setProperty("--mdp-block-label-top", `${(top + bottom) / 2 - hostTop}px`);
+	});
 }
 
 function applyHoverScope(

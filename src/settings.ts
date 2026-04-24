@@ -29,6 +29,7 @@ export interface MDPSettings {
 	embellishmentVisibility: "always" | "hover";
 	embellishmentHoverScope: "mark" | "section";
 	showProvenanceLabels: boolean;
+	provenanceLabelGutter: "left" | "right";
 	showRibbonToggle: boolean;
 }
 
@@ -48,6 +49,7 @@ export const DEFAULT_SETTINGS: MDPSettings = {
 	embellishmentVisibility: "hover",
 	embellishmentHoverScope: "section",
 	showProvenanceLabels: true,
+	provenanceLabelGutter: "right",
 	showRibbonToggle: true,
 };
 

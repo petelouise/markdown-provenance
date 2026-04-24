@@ -98,6 +98,23 @@ export class MDPSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
+			.setName("Provenance label gutter")
+			.setDesc("Choose which side of block provenance regions shows the text label.")
+			.addDropdown(drop => {
+				drop
+					.addOption("right", "Right gutter")
+					.addOption("left", "Left gutter")
+					.setValue(this.plugin.settings.provenanceLabelGutter)
+					.onChange((value) => {
+						void (async () => {
+							this.plugin.settings.provenanceLabelGutter = value as MDPSettings["provenanceLabelGutter"];
+							await this.plugin.saveSettings();
+							this.plugin.applyEmbellishmentVisibility();
+						})();
+					});
+			});
+
+		new Setting(containerEl)
 			.setName("Hover reveal scope")
 			.setDesc(
 				"Choose whether hover reveals only the hovered mark, or every embellishment " +

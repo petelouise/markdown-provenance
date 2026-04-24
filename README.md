@@ -133,7 +133,7 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/m
 | Setting | Description |
 |---------|-------------|
 | **Embellishment colours** | Customize the base embellishment color for each provenance type, with an optional separate dark-mode palette |
-| **Default embellishment visibility** | Show embellishments all the time, or only reveal them on hover |
+| **Default embellishment visibility** | Show embellishments all the time, or reveal them on section hover |
 | **Show provenance labels** | Display compact text labels on marked provenance so colour is not the only cue |
 | **Provenance label gutter** | Choose whether block provenance labels appear in the right or left gutter |
 | **Hover reveal scope** | In hover mode, reveal just the hovered mark or the whole current section |

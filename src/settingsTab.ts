@@ -63,13 +63,13 @@ export class MDPSettingTab extends PluginSettingTab {
 			.setName("Default embellishment visibility")
 			.setDesc(
 				"Choose whether provenance embellishments are visible while you write, or " +
-				"only appear when you hover over marked text. The command palette " +
+				"reveal when you hover through a marked section. The command palette " +
 				"toggle temporarily flips this behavior."
 			)
 			.addDropdown(drop => {
 				drop
 					.addOption("always", "Always show embellishments")
-					.addOption("hover", "Show on hover")
+					.addOption("hover", "Reveal on section hover")
 					.setValue(this.plugin.settings.embellishmentVisibility)
 					.onChange((value) => {
 						void (async () => {
@@ -122,8 +122,8 @@ export class MDPSettingTab extends PluginSettingTab {
 			)
 			.addDropdown(drop => {
 				drop
-					.addOption("mark", "Just the hovered mark")
-					.addOption("section", "Current section")
+					.addOption("mark", "Hovered mark")
+					.addOption("section", "Section hover")
 					.setValue(this.plugin.settings.embellishmentHoverScope)
 					.onChange((value) => {
 						void (async () => {

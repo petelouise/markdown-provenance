@@ -18,6 +18,7 @@ export default class MDPPlugin extends Plugin {
 	private ribbonToggleEl: HTMLElement | null = null;
 	private activeHoverScopeId: string | null = null;
 	private activeHoverTargets: HTMLElement[] = [];
+	private hoverClearTimer: number | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -89,7 +90,10 @@ export default class MDPPlugin extends Plugin {
 
 		this.addSettingTab(new MDPSettingTab(this.app, this));
 		this.registerDomEvent(document, "mouseover", (event) => {
-			this.updateActiveHoverScope(event.target);
+			this.updateActiveHoverScope(event.target, event.clientX, event.clientY);
+		});
+		this.registerDomEvent(document, "mousemove", (event) => {
+			this.updateActiveHoverScope(event.target, event.clientX, event.clientY);
 		});
 		this.registerDomEvent(document, "focusin", (event) => {
 			this.updateActiveHoverScope(event.target);
@@ -101,6 +105,7 @@ export default class MDPPlugin extends Plugin {
 
 	onunload() {
 		if (this.statusBarTimer !== null) window.clearTimeout(this.statusBarTimer);
+		if (this.hoverClearTimer !== null) window.clearTimeout(this.hoverClearTimer);
 		this.statusBarEl?.remove();
 		document.body.classList.remove(
 			"mdp-embs-hover-only",
@@ -273,14 +278,14 @@ export default class MDPPlugin extends Plugin {
 		if (this.settings.embellishmentVisibility === "hover") {
 			return this.embVisibilityInverted
 				? "Provenance embellishments revealed"
-				: "Provenance embellishments shown on hover";
+				: "Provenance embellishments revealed on section hover";
 		}
 		return this.embVisibilityInverted
 			? "Provenance embellishments hidden"
 			: "Provenance embellishments visible";
 	}
 
-	private updateActiveHoverScope(target: EventTarget | null) {
+	private updateActiveHoverScope(target: EventTarget | null, clientX?: number, clientY?: number) {
 		if (
 			this.settings.embellishmentVisibility !== "hover" ||
 			this.settings.embellishmentHoverScope !== "section" ||
@@ -293,12 +298,20 @@ export default class MDPPlugin extends Plugin {
 		const hoverAnchor = target instanceof Element
 			? target.closest<HTMLElement>("[data-mdp-hover-scope]")
 			: null;
-		const hoverScopeId = hoverAnchor?.dataset.mdpHoverScope ?? null;
+		const hoverScopeId = hoverAnchor?.dataset.mdpHoverScope
+			?? this.getHoverScopeAtPoint(clientX, clientY);
 
-		if (hoverScopeId === this.activeHoverScopeId) return;
+		if (hoverScopeId === this.activeHoverScopeId) {
+			if (hoverScopeId) this.cancelHoverScopeClear();
+			return;
+		}
+		if (!hoverScopeId) {
+			this.scheduleHoverScopeClear();
+			return;
+		}
+
+		this.cancelHoverScopeClear();
 		this.clearActiveHoverScope();
-		if (!hoverScopeId) return;
-
 		this.activeHoverScopeId = hoverScopeId;
 		for (const element of Array.from(document.querySelectorAll<HTMLElement>(".mdp-hover-target"))) {
 			if (element.dataset.mdpHoverScope !== hoverScopeId) continue;
@@ -307,7 +320,54 @@ export default class MDPPlugin extends Plugin {
 		}
 	}
 
+	private getHoverScopeAtPoint(clientX?: number, clientY?: number): string | null {
+		if (clientX === undefined || clientY === undefined) return null;
+
+		const scopes = new Map<string, DOMRect[]>();
+		for (const element of Array.from(document.querySelectorAll<HTMLElement>(".mdp-hover-target"))) {
+			const hoverScopeId = element.dataset.mdpHoverScope;
+			if (!hoverScopeId) continue;
+			const rect = element.getBoundingClientRect();
+			if (rect.width === 0 && rect.height === 0) continue;
+			const rects = scopes.get(hoverScopeId) ?? [];
+			rects.push(rect);
+			scopes.set(hoverScopeId, rects);
+		}
+
+		let best: { hoverScopeId: string; distance: number } | null = null;
+		for (const [hoverScopeId, rects] of scopes) {
+			const top = Math.min(...rects.map((rect) => rect.top)) - 16;
+			const bottom = Math.max(...rects.map((rect) => rect.bottom)) + 16;
+			const left = Math.min(...rects.map((rect) => rect.left)) - 56;
+			const right = Math.max(...rects.map((rect) => rect.right)) + 96;
+			if (clientY < top || clientY > bottom || clientX < left || clientX > right) continue;
+
+			const centerY = (top + bottom) / 2;
+			const distance = Math.abs(clientY - centerY);
+			if (!best || distance < best.distance) {
+				best = { hoverScopeId, distance };
+			}
+		}
+
+		return best?.hoverScopeId ?? null;
+	}
+
+	private scheduleHoverScopeClear() {
+		if (this.hoverClearTimer !== null) return;
+		this.hoverClearTimer = window.setTimeout(() => {
+			this.hoverClearTimer = null;
+			this.clearActiveHoverScope();
+		}, 160);
+	}
+
+	private cancelHoverScopeClear() {
+		if (this.hoverClearTimer === null) return;
+		window.clearTimeout(this.hoverClearTimer);
+		this.hoverClearTimer = null;
+	}
+
 	private clearActiveHoverScope() {
+		this.cancelHoverScopeClear();
 		for (const element of this.activeHoverTargets) {
 			element.classList.remove("mdp-hover-active");
 		}
